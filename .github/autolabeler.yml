@@ -1,5 +1,0 @@
-# configuration for https://github.com/probot/autolabeler
-
-dependency-change: "/project/Dependencies.scala"
-
-'t:stream': ["/stream", "/stream-testkit", "/stream-tests", "/stream-tests-tck", "/stream-typed"]
