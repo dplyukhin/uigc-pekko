@@ -6,4 +6,5 @@ This project is a fork of Apache Pekko that adds an API for managed actors (acto
 
 Apache Pekko is available under the Apache License, version 2.0. See [LICENSE](https://github.com/apache/pekko/blob/main/LICENSE) file for details.
 
-Files in the `actor-managed` subproject are provided under the Hippocratic License, version 3.0. See [LICENSE](./LICENSE) for details.
+Files in the `uigc` subproject are provided under the Hippocratic License, version 3.0. See [LICENSE](./LICENSE) for 
+details.

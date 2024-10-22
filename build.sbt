@@ -80,7 +80,8 @@ lazy val userProjects: Seq[ProjectReference] = List[ProjectReference](
   stream,
   streamTestkit,
   streamTyped,
-  testkit)
+  testkit,
+  uigc)
 
 lazy val aggregatedProjects: Seq[ProjectReference] = userProjects ++ List[ProjectReference](
   actorTests,
@@ -113,6 +114,13 @@ lazy val root = Project(id = "pekko", base = file("."))
     Compile / headerCreate / unmanagedSources := (baseDirectory.value / "project").**("*.scala").get)
   .settings(PekkoBuild.welcomeSettings)
   .enablePlugins(CopyrightHeaderForBuild)
+
+lazy val uigc = pekkoModule("uigc")
+  .dependsOn(actor, slf4j, actorTyped, cluster, clusterTyped)
+  .settings(AutomaticModuleName.settings("pekko.uigc"))
+  .settings(VersionGenerator.settings)
+  .settings(serialversionRemoverPluginSettings)
+  .enablePlugins(BoilerplatePlugin, SbtOsgi, Jdk9)
 
 lazy val actor = pekkoModule("actor")
   .settings(Dependencies.actor)
