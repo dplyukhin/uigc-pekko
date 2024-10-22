@@ -28,7 +28,7 @@ import org.apache.pekko
 import pekko._
 import pekko.actor.{ ActorRef, ClassicActorSystemProvider, Status }
 import pekko.dispatch.ExecutionContexts
-import pekko.japi.{ function, Util }
+import pekko.japi.function
 import pekko.japi.function.Creator
 import pekko.stream._
 import pekko.stream.impl.LinearTraversalBuilder
@@ -57,6 +57,8 @@ object Sink {
    * The returned [[java.util.concurrent.CompletionStage]] will be completed with value of the final
    * function evaluation when the input stream ends, predicate `p` returns false, or completed with `Failure`
    * if there is a failure is signaled in the stream.
+   *
+   * @since 1.1.0
    */
   def foldWhile[U, In](
       zero: U, p: function.Predicate[U], f: function.Function2[U, In, U]): javadsl.Sink[In, CompletionStage[U]] =
@@ -202,7 +204,7 @@ object Sink {
    * normal end of the stream, or completed with `Failure` if there is a failure signaled in
    * the stream.
    */
-  def foreachAsync[T](parallelism: Int)(
+  def foreachAsync[T](parallelism: Int,
       f: function.Function[T, CompletionStage[Void]]): Sink[T, CompletionStage[Done]] =
     new Sink(
       scaladsl.Sink
@@ -223,7 +225,7 @@ object Sink {
   @deprecated(
     "Use `foreachAsync` instead, it allows you to choose how to run the procedure, by calling some other API returning a CompletionStage or using CompletableFuture.supplyAsync.",
     since = "Akka 2.5.17")
-  def foreachParallel[T](parallel: Int)(f: function.Procedure[T])(
+  def foreachParallel[T](parallel: Int, f: function.Procedure[T],
       ec: ExecutionContext): Sink[T, CompletionStage[Done]] =
     new Sink(scaladsl.Sink.foreachParallel(parallel)(f.apply)(ec).toCompletionStage())
 
@@ -276,7 +278,7 @@ object Sink {
     new Sink(scaladsl.Sink.lastOption[In].mapMaterializedValue(_.map(_.toJava)(ExecutionContexts.parasitic).asJava))
 
   /**
-   * A `Sink` that materializes into a a `CompletionStage` of `List<In>` containing the last `n` collected elements.
+   * A `Sink` that materializes into a `CompletionStage` of `List<In>` containing the last `n` collected elements.
    *
    * If the stream completes before signaling at least n elements, the `CompletionStage` will complete with all elements seen so far.
    * If the stream never completes the `CompletionStage` will never complete.
@@ -459,7 +461,7 @@ object Sink {
       sinks: java.util.List[_ <: Graph[SinkShape[U], M]],
       fanOutStrategy: function.Function[java.lang.Integer, Graph[UniformFanOutShape[T, U], NotUsed]])
       : Sink[T, java.util.List[M]] = {
-    val seq = if (sinks != null) Util.immutableSeq(sinks).collect {
+    val seq = if (sinks != null) CollectionUtil.toSeq(sinks).collect {
       case sink: Sink[U @unchecked, M @unchecked] => sink.asScala
       case other                                  => other
     }

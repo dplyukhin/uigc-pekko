@@ -100,5 +100,5 @@ object JdkOptions extends AutoPlugin {
             "A JDK 8 installation was not found, but is required to build Apache Pekko. To manually specify a JDK 8 installation, set the JAVA_8_HOME environment variable to its path or use the \"set every jdk8home := \\\"/path/to/jdk\\\" sbt command. If you have no JDK 8 installation, target your system JDK with the \"set every targetSystemJdk := true\" sbt command, but beware resulting artifacts will not work on JDK 8")
       }
 
-  lazy val targetJdkSettings = Seq(targetSystemJdk := false, jdk8home := sys.env.get("JAVA_8_HOME").getOrElse(""))
+  lazy val targetJdkSettings = Seq(targetSystemJdk := true, jdk8home := sys.env.get("JAVA_8_HOME").getOrElse(""))
 }

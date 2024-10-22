@@ -22,7 +22,7 @@ import com.gradle.develocity.agent.sbt.DevelocityPlugin.autoImport.{
   ProjectId,
   Publishing
 }
-import sbt.{ url, AutoPlugin, Def, PluginTrigger, Plugins, Setting }
+import sbt.{ inConfig, url, AutoPlugin, Def, PluginTrigger, Plugins, Setting }
 import sbt.Keys.insideCI
 
 object PekkoDevelocityPlugin extends AutoPlugin {
@@ -53,6 +53,11 @@ object PekkoDevelocityPlugin extends AutoPlugin {
               .withObfuscation(
                 original.buildScan.obfuscation
                   .withIpAddresses(_.map(_ => ObfuscatedIPv4Address))))
+          .withBuildCache(
+            original.buildCache
+              .withLocal(
+                original.buildCache.local
+                  .withEnabled(false)))
       if (isInsideCI) {
         apacheDevelocityConfiguration
           .withTestRetryConfiguration(
@@ -62,4 +67,15 @@ object PekkoDevelocityPlugin extends AutoPlugin {
           )
       } else apacheDevelocityConfiguration
     })
+}
+
+/**
+ * An AutoPlugin to add Develocity test configuration to the TestJdk9 configuration.
+ */
+object PekkoDevelocityJdk9TestSettingsPlugin extends AutoPlugin {
+  override lazy val trigger: PluginTrigger = allRequirements
+  override lazy val requires: Plugins = DevelocityPlugin && Jdk9
+
+  // See https://docs.gradle.com/develocity/sbt-plugin/#enabling_build_cache_in_a_custom_sbt_configuration
+  override lazy val projectSettings = DevelocityPlugin.develocitySettings(Jdk9.TestJdk9)
 }

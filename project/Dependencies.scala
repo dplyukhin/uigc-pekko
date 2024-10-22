@@ -19,7 +19,7 @@ object Dependencies {
   import DependencyHelpers._
 
   object Protobuf {
-    val protobufJavaVersion = "3.25.3"
+    val protobufJavaVersion = "3.25.5"
     val protocVersion = protobufJavaVersion
   }
 
@@ -27,20 +27,21 @@ object Dependencies {
     .withRank(KeyRanks.Invisible) // avoid 'unused key' warning
 
   val junitVersion = "4.13.2"
-  val junit5Version = "5.10.2"
-  val slf4jVersion = "2.0.13"
+  val junit5Version = "5.11.1"
+  val slf4jVersion = "2.0.16"
   // check agrona version when updating this
-  val aeronVersion = "1.44.1"
+  val aeronVersion = "1.45.0"
   // needs to be inline with the aeron version, check
   // https://github.com/real-logic/aeron/blob/1.x.y/build.gradle
-  val agronaVersion = "1.21.1"
-  val nettyVersion = "4.1.109.Final"
+  val agronaVersion = "1.22.0"
+  val bouncyCastleVersion = "1.78.1"
+  val nettyVersion = "4.1.114.Final"
   val logbackVersion = "1.3.14"
 
-  val jacksonCoreVersion = "2.17.1"
+  val jacksonCoreVersion = "2.17.2"
   val jacksonDatabindVersion = jacksonCoreVersion
 
-  val scala212Version = "2.12.19"
+  val scala212Version = "2.12.20"
   val scala213Version = "2.13.14"
   val scala3Version = "3.3.3"
   val allScalaVersions = Seq(scala213Version, scala212Version, scala3Version)
@@ -49,9 +50,9 @@ object Dependencies {
 
   val sslConfigVersion = "0.6.1"
 
-  val scalaTestVersion = "3.2.18"
-  val scalaTestScalaCheckVersion = "1-17"
-  val scalaCheckVersion = "1.17.0"
+  val scalaTestVersion = "3.2.19"
+  val scalaTestScalaCheckVersion = "1-18"
+  val scalaCheckVersion = "1.18.0"
 
   val Versions =
     Seq(crossScalaVersions := allScalaVersions, scalaVersion := allScalaVersions.head,
@@ -75,7 +76,7 @@ object Dependencies {
 
     val sigar = "org.fusesource" % "sigar" % "1.6.4"
 
-    val jctools = "org.jctools" % "jctools-core" % "4.0.3"
+    val jctools = "org.jctools" % "jctools-core" % "4.0.5"
 
     // reactive streams
     val reactiveStreams = "org.reactivestreams" % "reactive-streams" % reactiveStreamsVersion
@@ -114,15 +115,17 @@ object Dependencies {
 
     object Docs {
       val sprayJson = "io.spray" %% "spray-json" % "1.3.6" % Test
-      val gson = "com.google.code.gson" % "gson" % "2.10.1" % Test
+      val gson = "com.google.code.gson" % "gson" % "2.11.0" % Test
     }
 
     object TestDependencies {
-      val bcprov = "org.bouncycastle" % "bcprov-jdk18on" % "1.78.1" % Test
-      val commonsIo = "commons-io" % "commons-io" % "2.16.1" % Test
-      val commonsCodec = "commons-codec" % "commons-codec" % "1.17.0" % Test
-      val commonsCompress = "org.apache.commons" % "commons-compress" % "1.26.1" % Test
-      val guava = "com.google.guava" % "guava" % "33.2.0-jre" % Test
+      val bcprov = "org.bouncycastle" % "bcprov-jdk18on" % bouncyCastleVersion % Test
+      val bcpkix = "org.bouncycastle" % "bcpkix-jdk18on" % bouncyCastleVersion % Test
+      val bcutil = "org.bouncycastle" % "bcutil-jdk18on" % bouncyCastleVersion % Test
+      val commonsIo = "commons-io" % "commons-io" % "2.17.0" % Test
+      val commonsCodec = "commons-codec" % "commons-codec" % "1.17.1" % Test
+      val commonsCompress = "org.apache.commons" % "commons-compress" % "1.27.1" % Test
+      val guava = "com.google.guava" % "guava" % "33.3.1-jre" % Test
       val junit = "junit" % "junit" % junitVersion % Test
       val junit5 = "org.junit.jupiter" % "junit-jupiter-engine" % junit5Version % Test
       val httpClient = "org.apache.httpcomponents" % "httpclient" % "4.5.14" % Test
@@ -148,27 +151,29 @@ object Dependencies {
       val jimfs = "com.google.jimfs" % "jimfs" % "1.3.0" % Test
 
       // the extra dependency overrides for bcprov, commonsCompress and guava should be reviewed - https://github.com/apache/pekko/issues/1317
-      val dockerClientVersion = "3.3.6"
+      val dockerClientVersion = "3.4.0"
       val dockerClient = Seq(
         "com.github.docker-java" % "docker-java-core" % dockerClientVersion % Test,
         "com.github.docker-java" % "docker-java-transport-httpclient5" % dockerClientVersion % Test,
         TestDependencies.bcprov,
+        TestDependencies.bcpkix,
+        TestDependencies.bcutil,
         TestDependencies.commonsCompress,
         TestDependencies.guava)
 
       val jackson = Seq(
-        (jacksonCore % Test).force(),
-        (jacksonAnnotations % Test).force(),
-        (jacksonDatabind % Test).force(),
-        ("com.fasterxml.jackson.jaxrs" % "jackson-jaxrs-base" % jacksonCoreVersion % Test).force(),
-        ("com.fasterxml.jackson.jaxrs" % "jackson-jaxrs-json-provider" % jacksonCoreVersion % Test).force(),
-        ("com.fasterxml.jackson.datatype" % "jackson-datatype-guava" % jacksonCoreVersion % Test).force())
+        jacksonCore % Test,
+        jacksonAnnotations % Test,
+        jacksonDatabind % Test,
+        "com.fasterxml.jackson.jaxrs" % "jackson-jaxrs-base" % jacksonCoreVersion % Test,
+        "com.fasterxml.jackson.jaxrs" % "jackson-jaxrs-json-provider" % jacksonCoreVersion % Test,
+        "com.fasterxml.jackson.datatype" % "jackson-datatype-guava" % jacksonCoreVersion % Test)
 
       // metrics, measurements, perf testing
-      val metrics = "io.dropwizard.metrics" % "metrics-core" % "4.2.25" % Test
-      val metricsJvm = "io.dropwizard.metrics" % "metrics-jvm" % "4.2.25" % Test
+      val metrics = "io.dropwizard.metrics" % "metrics-core" % "4.2.27" % Test
+      val metricsJvm = "io.dropwizard.metrics" % "metrics-jvm" % "4.2.27" % Test
       val latencyUtils = "org.latencyutils" % "LatencyUtils" % "2.0.3" % Test
-      val hdrHistogram = "org.hdrhistogram" % "HdrHistogram" % "2.2.1" % Test
+      val hdrHistogram = "org.hdrhistogram" % "HdrHistogram" % "2.2.2" % Test
       val metricsAll = Seq(metrics, metricsJvm, latencyUtils, hdrHistogram)
 
       // sigar logging

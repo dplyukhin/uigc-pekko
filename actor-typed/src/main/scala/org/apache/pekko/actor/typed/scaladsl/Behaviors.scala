@@ -15,8 +15,8 @@ package org.apache.pekko.actor.typed
 package scaladsl
 
 import scala.reflect.ClassTag
-
 import org.apache.pekko
+import org.apache.pekko.actor.typed.SuperviseBehavior
 import pekko.actor.typed.internal._
 import pekko.annotation.{ DoNotInherit, InternalApi }
 
@@ -134,6 +134,27 @@ object Behaviors {
     new ReceiveMessageImpl(onMessage)
 
   /**
+   * Simplified version of [[receiveMessage]] with only a single argument - the message
+   * to be handled, but it doesn't produce a return value of next behavior.
+   * Useful for when the behavior doesn't want to change in runtime.
+   *
+   * Construct an actor behavior that can react to incoming messages but not to
+   * lifecycle signals. After spawning this actor from another actor (or as the
+   * guardian of an [[pekko.actor.typed.ActorSystem]]) it will be executed within an
+   * [[ActorContext]] that allows access to the system, spawning and watching
+   * other actors, etc.
+   *
+   * Compared to using [[AbstractBehavior]] this factory is a more functional style
+   * of defining the `Behavior`. Processing the next message will not result in
+   * different behavior than this one
+   *
+   * @since 1.1.0
+   */
+  def receiveMessageWithSame[T](onMessage: T => Unit): Receive[T] = {
+    new ReceiveMessageImpl(onMessage.andThen(_ => same))
+  }
+
+  /**
    * Construct an actor `Behavior` from a partial message handler which treats undefined messages as unhandled.
    */
   def receivePartial[T](onMessage: PartialFunction[(ActorContext[T], T), Behavior[T]]): Receive[T] =
@@ -233,9 +254,8 @@ object Behaviors {
 
     /** Specify the [[SupervisorStrategy]] to be invoked when the wrapped behavior throws. */
     def onFailure[Thr <: Throwable](strategy: SupervisorStrategy)(
-        implicit tag: ClassTag[Thr] = ThrowableClassTag): Behavior[T] = {
-      val effectiveTag = if (tag == ClassTag.Nothing) ThrowableClassTag else tag
-      Supervisor(Behavior.validateAsInitial(wrapped), strategy)(effectiveTag)
+        implicit tag: ClassTag[Thr] = ThrowableClassTag): SuperviseBehavior[T] = {
+      new SuperviseBehavior[T](wrapped).onFailure(strategy)(tag)
     }
   }
 

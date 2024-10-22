@@ -20,13 +20,7 @@ import scala.reflect.ClassTag
 
 import org.apache.pekko
 import pekko.actor.typed._
-import pekko.actor.typed.internal.{
-  BehaviorImpl,
-  StashBufferImpl,
-  Supervisor,
-  TimerSchedulerImpl,
-  WithMdcBehaviorInterceptor
-}
+import pekko.actor.typed.internal.{ BehaviorImpl, StashBufferImpl, TimerSchedulerImpl, WithMdcBehaviorInterceptor }
 import pekko.japi.function.{ Effect, Function2 => JapiFunction2 }
 import pekko.japi.pf.PFBuilder
 import pekko.util.ccompat.JavaConverters._
@@ -150,6 +144,29 @@ object Behaviors {
     new BehaviorImpl.ReceiveBehavior((_, msg) => onMessage.apply(msg))
 
   /**
+   * Simplified version of [[receiveMessage]] with only a single argument - the message
+   * to be handled, but it doesn't produce a return value of next behavior.
+   * Useful for when the behavior doesn't want to change in runtime.
+   *
+   * Construct an actor behavior that can react to incoming messages but not to
+   * lifecycle signals. After spawning this actor from another actor (or as the
+   * guardian of an [[pekko.actor.typed.ActorSystem]]) it will be executed within an
+   * [[ActorContext]] that allows access to the system, spawning and watching
+   * other actors, etc.
+   *
+   * Compared to using [[AbstractBehavior]] this factory is a more functional style
+   * of defining the `Behavior`. Processing the next message will not result in
+   * different behavior than this one
+   *
+   * @since 1.1.0
+   */
+  def receiveMessageWithSame[T](onMessage: pekko.japi.Procedure[T]): Behavior[T] =
+    new BehaviorImpl.ReceiveBehavior((_, msg) => {
+      onMessage.apply(msg)
+      same[T]
+    })
+
+  /**
    * Construct an actor behavior that can react to both incoming messages and
    * lifecycle signals. After spawning this actor from another actor (or as the
    * guardian of an [[pekko.actor.typed.ActorSystem]]) it will be executed within an
@@ -271,8 +288,8 @@ object Behaviors {
      *
      * Only exceptions of the given type (and their subclasses) will be handled by this supervision behavior.
      */
-    def onFailure[Thr <: Throwable](clazz: Class[Thr], strategy: SupervisorStrategy): Behavior[T] =
-      Supervisor(Behavior.validateAsInitial(wrapped), strategy)(ClassTag(clazz))
+    def onFailure[Thr <: Throwable](clazz: Class[Thr], strategy: SupervisorStrategy): SuperviseBehavior[T] =
+      new SuperviseBehavior[T](wrapped).onFailure(clazz, strategy)
 
     /**
      * Specify the [[SupervisorStrategy]] to be invoked when the wrapped behavior throws.
@@ -280,7 +297,7 @@ object Behaviors {
      * All non-fatal (see [[scala.util.control.NonFatal]]) exceptions types will be handled using the given strategy.
      */
     def onFailure(strategy: SupervisorStrategy): Behavior[T] =
-      onFailure(classOf[Exception], strategy)
+      new SuperviseBehavior[T](wrapped).onFailure(strategy)
   }
 
   /**

@@ -13,6 +13,7 @@
 
 package org.apache.pekko.stream.javadsl
 
+import java.util.Optional
 import java.util.concurrent.CompletionStage
 
 import scala.annotation.unchecked.uncheckedVariance
@@ -22,12 +23,12 @@ import pekko.actor.ClassicActorSystemProvider
 import pekko.annotation.ApiMayChange
 import pekko.event.{ LogMarker, LoggingAdapter, MarkerLoggingAdapter }
 import pekko.japi.Pair
-import pekko.japi.Util
 import pekko.japi.function
 import pekko.stream._
 import pekko.util.ConstantFun
 import pekko.util.FutureConverters._
 import pekko.util.JavaDurationConverters._
+import pekko.util.OptionConverters._
 import pekko.util.ccompat.JavaConverters._
 
 object SourceWithContext {
@@ -38,6 +39,38 @@ object SourceWithContext {
   def fromPairs[Out, CtxOut, Mat](under: Source[Pair[Out, CtxOut], Mat]): SourceWithContext[Out, CtxOut, Mat] = {
     new SourceWithContext(scaladsl.SourceWithContext.fromTuples(under.asScala.map(_.toScala)))
   }
+
+  /**
+   * Creates a SourceWithContext from an existing base SourceWithContext outputting an optional element
+   * and applying an additional viaFlow only if the element in the stream is defined.
+   *
+   * '''Emits when''' the provided viaFlow runs with defined elements
+   *
+   * '''Backpressures when''' the viaFlow runs for the defined elements and downstream backpressures
+   *
+   * '''Completes when''' upstream completes
+   *
+   * '''Cancels when''' downstream cancels
+   *
+   * @param source The base source that outputs an optional element
+   * @param viaFlow The flow that gets used if the optional element in is defined. This flow only works
+   *                on the data portion of flow and ignores the context so this flow *must* not re-order,
+   *                drop or emit multiple elements for one incoming element
+   * @param combine How to combine the materialized values of source and viaFlow
+   * @return a SourceWithContext with the viaFlow applied onto defined elements of the flow. The output value
+   *         is contained within an Optional which indicates whether the original source's element had viaFlow
+   *         applied.
+   * @since 1.1.0
+   */
+  @ApiMayChange
+  def unsafeOptionalDataVia[SOut, FOut, Ctx, SMat, FMat, Mat](source: SourceWithContext[Optional[SOut], Ctx, SMat],
+      viaFlow: Flow[SOut, FOut, FMat],
+      combine: function.Function2[SMat, FMat, Mat]
+  ): SourceWithContext[Optional[FOut], Ctx, Mat] =
+    scaladsl.SourceWithContext.unsafeOptionalDataVia(source.map(_.toScala).asScala, viaFlow.asScala)(
+      combinerToScala(combine)).map(
+      _.toJava).asJava
+
 }
 
 /**
@@ -233,7 +266,7 @@ final class SourceWithContext[+Out, +Ctx, +Mat](delegate: scaladsl.SourceWithCon
    * @see [[pekko.stream.javadsl.Source.mapConcat]]
    */
   def mapConcat[Out2](f: function.Function[Out, _ <: java.lang.Iterable[Out2]]): SourceWithContext[Out2, Ctx, Mat] =
-    viaScala(_.mapConcat(elem => Util.immutableSeq(f.apply(elem))))
+    viaScala(_.mapConcat(elem => f.apply(elem).asScala))
 
   /**
    * Apply the given function to each context element (leaving the data elements unchanged).

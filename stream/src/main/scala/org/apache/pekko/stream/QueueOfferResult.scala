@@ -76,4 +76,11 @@ object QueueOfferResult {
   case object QueueClosed extends QueueCompletionResult {
     override def isEnqueued: Boolean = false
   }
+
+  /**
+   * Java API: The `QueueClosed` singleton instance
+   *
+   * @since 1.1.0
+   */
+  def closed: QueueOfferResult = QueueClosed
 }

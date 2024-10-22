@@ -51,7 +51,7 @@ final class Sink[-In, +Mat](override val traversalBuilder: LinearTraversalBuilde
    * '''Cancels when''' original [[Sink]] cancels
    * @since 1.1.0
    */
-  def contramap[In2](f: In2 => In): Sink[In2, Mat] = Flow.fromFunction(f).toMat(this)(Keep.right)
+  def contramap[In2](f: In2 => In): Sink[In2, Mat] = Sink.contramapImpl(this, f)
 
   /**
    * Connect this `Sink` to a `Source` and run it. The returned value is the materialized value
@@ -137,6 +137,10 @@ object Sink {
 
   /** INTERNAL API */
   def shape[T](name: String): SinkShape[T] = SinkShape(Inlet(name + ".in"))
+
+  @InternalApi private[pekko] final def contramapImpl[In, In2, Mat](
+      sink: Graph[SinkShape[In], Mat], f: In2 => In): Sink[In2, Mat] =
+    Flow.fromFunction(f).toMat(sink)(Keep.right)
 
   /**
    * A graph with the shape of a sink logically is a sink, this method makes
@@ -248,7 +252,7 @@ object Sink {
   }
 
   /**
-   * A `Sink` that materializes into a a `Future` of `immutable.Seq[T]` containing the last `n` collected elements.
+   * A `Sink` that materializes into a `Future` of `immutable.Seq[T]` containing the last `n` collected elements.
    *
    * If the stream completes before signaling at least n elements, the `Future` will complete with all elements seen so far.
    * If the stream never completes, the `Future` will never complete.
@@ -424,6 +428,8 @@ object Sink {
    * if there is a failure signaled in the stream.
    *
    * @see [[#fold]]
+   *
+   * @since 1.1.0
    */
   def foldWhile[U, T](zero: U)(p: U => Boolean)(f: (U, T) => U): Sink[T, Future[U]] =
     Flow[T].foldWhile(zero)(p)(f).toMat(Sink.head)(Keep.right).named("foldWhileSink")

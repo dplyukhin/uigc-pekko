@@ -47,12 +47,12 @@ import pekko.cluster.ClusterEvent._
 import pekko.cluster.Member
 import pekko.cluster.MemberStatus
 import pekko.cluster.pubsub._
-import pekko.japi.Util.immutableSeq
 import pekko.remote.DeadlineFailureDetector
 import pekko.routing.ConsistentHash
 import pekko.routing.MurmurHash
 import pekko.util.MessageBuffer
 import pekko.util.ccompat._
+import pekko.util.ccompat.JavaConverters._
 
 @ccompatUsedUntil213
 @deprecated(
@@ -72,7 +72,7 @@ object ClusterClientSettings {
    * the default configuration `pekko.cluster.client`.
    */
   def apply(config: Config): ClusterClientSettings = {
-    val initialContacts = immutableSeq(config.getStringList("initial-contacts")).map(ActorPath.fromString).toSet
+    val initialContacts = config.getStringList("initial-contacts").asScala.map(ActorPath.fromString).toSet
     new ClusterClientSettings(
       initialContacts,
       establishingGetContactsInterval = config.getDuration("establishing-get-contacts-interval", MILLISECONDS).millis,
@@ -171,10 +171,8 @@ final class ClusterClientSettings(
   /**
    * Java API
    */
-  def withInitialContacts(initialContacts: java.util.Set[ActorPath]): ClusterClientSettings = {
-    import pekko.util.ccompat.JavaConverters._
+  def withInitialContacts(initialContacts: java.util.Set[ActorPath]): ClusterClientSettings =
     withInitialContacts(initialContacts.asScala.toSet)
-  }
 
   def withEstablishingGetContactsInterval(establishingGetContactsInterval: FiniteDuration): ClusterClientSettings =
     copy(establishingGetContactsInterval = establishingGetContactsInterval)
@@ -282,7 +280,6 @@ case object GetContactPoints extends GetContactPoints {
  * @param contactPoints The presently known list of contact points.
  */
 final case class ContactPoints(contactPoints: Set[ActorPath]) {
-  import pekko.util.ccompat.JavaConverters._
 
   /**
    * Java API
@@ -865,7 +862,6 @@ case object GetClusterClients extends GetClusterClients {
  * @param clusterClients The presently known list of cluster clients.
  */
 final case class ClusterClients(clusterClients: Set[ActorRef]) {
-  import pekko.util.ccompat.JavaConverters._
 
   /**
    * Java API
