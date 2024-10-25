@@ -19,7 +19,7 @@ import org.apache.pekko.annotation.InternalStableApi
  * INTERNAL API
  */
 @InternalStableApi
-private[pekko] object OptionVal {
+object OptionVal {
 
   def apply[A](x: A): OptionVal[A] = new OptionVal(x)
 
@@ -46,7 +46,7 @@ private[pekko] object OptionVal {
  * See https://hseeberger.wordpress.com/2013/10/04/name-based-extractors-in-scala-2-11/
  */
 @InternalStableApi
-private[pekko] final class OptionVal[+A](val x: A) extends AnyVal {
+final class OptionVal[+A](val x: A) extends AnyVal {
 
   /**
    * Returns true if the option is `OptionVal.None`, false otherwise.

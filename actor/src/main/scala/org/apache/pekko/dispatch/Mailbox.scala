@@ -233,6 +233,9 @@ private[pekko] abstract class Mailbox(val messageQueue: MessageQueue)
         processMailbox() // Then deal with messages
       }
     } finally {
+      if (Mailbox.debug) println("Setting " + actor.self + " as idle.")
+      if (!hasMessages && !hasSystemMessages)
+        messageQueue.onFinishedProcessingHook()
       setAsIdle() // Volatile write, needed here
       dispatcher.registerForExecution(this, false, false)
     }
@@ -359,6 +362,8 @@ private[pekko] abstract class Mailbox(val messageQueue: MessageQueue)
  * It needs to at least support N producers and 1 consumer thread-safely.
  */
 trait MessageQueue {
+
+  var onFinishedProcessingHook: () => Unit = () => ()
 
   /**
    * Try to enqueue the message to this queue, or throw an exception.

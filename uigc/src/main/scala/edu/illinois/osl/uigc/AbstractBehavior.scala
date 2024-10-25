@@ -27,6 +27,7 @@ abstract class AbstractBehavior[T](context: ActorContext[T])
     context.engine.onIdle(msg, context.state, context.typedContext) match {
       case _: Engine.ShouldStop.type     => scaladsl.Behaviors.stopped
       case _: Engine.ShouldContinue.type => result
+      case _: Engine.Unhandled.type      => result
     }
   }
 

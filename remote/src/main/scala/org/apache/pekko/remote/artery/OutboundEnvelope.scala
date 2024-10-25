@@ -33,8 +33,9 @@ private[remote] object OutboundEnvelope {
 /**
  * INTERNAL API
  */
-private[remote] trait OutboundEnvelope extends NoSerializationVerificationNeeded {
-  def recipient: OptionVal[RemoteActorRef]
+trait OutboundEnvelope extends NoSerializationVerificationNeeded {
+  private[remote] def recipient: OptionVal[RemoteActorRef]
+  def target: OptionVal[ActorRef] = recipient
   def message: AnyRef
   def sender: OptionVal[ActorRef]
 
@@ -57,7 +58,7 @@ private[remote] object ReusableOutboundEnvelope {
 /**
  * INTERNAL API
  */
-private[remote] final class ReusableOutboundEnvelope extends OutboundEnvelope {
+final class ReusableOutboundEnvelope extends OutboundEnvelope {
   private var _recipient: OptionVal[RemoteActorRef] = OptionVal.None
   private var _message: AnyRef = null
   private var _sender: OptionVal[ActorRef] = OptionVal.None

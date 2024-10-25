@@ -34,7 +34,7 @@ import pekko.util.unused
 /**
  * INTERNAL API
  */
-private[remote] object OutboundHandshake {
+object OutboundHandshake {
 
   /**
    * Stream is failed with this exception if the handshake is not completed

@@ -23,6 +23,7 @@ import pekko.actor.ClassicActorContextProvider
 import pekko.actor.typed._
 import pekko.annotation.DoNotInherit
 import pekko.annotation.InternalApi
+import pekko.dispatch.MessageQueue
 import pekko.pattern.StatusReply
 import pekko.util.Timeout
 
@@ -48,6 +49,8 @@ import pekko.util.Timeout
  */
 @DoNotInherit
 trait ActorContext[T] extends TypedActorContext[T] with ClassicActorContextProvider {
+
+  def queue: MessageQueue = classicActorContext.queue
 
   /**
    * Get the `javadsl` of this `ActorContext`.

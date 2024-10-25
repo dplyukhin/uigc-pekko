@@ -319,7 +319,7 @@ trait ScalaActorSelection {
  * message is delivered by traversing the various actor paths involved.
  */
 @SerialVersionUID(2L) // it has protobuf serialization in pekko-remote
-private[pekko] final case class ActorSelectionMessage(
+final case class ActorSelectionMessage(
     msg: Any,
     elements: immutable.Iterable[SelectionPathElement],
     wildcardFanOut: Boolean)

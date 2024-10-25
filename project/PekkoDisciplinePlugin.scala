@@ -22,7 +22,7 @@ object PekkoDisciplinePlugin extends AutoPlugin {
   override lazy val projectSettings = disciplineSettings
 
   // allow toggling for pocs/exploration of ideas without discipline
-  lazy val enabled = !sys.props.contains("pekko.no.discipline")
+  lazy val enabled = false
 
   // We allow warnings in docs to get the 'snippets' right
   val nonFatalJavaWarningsFor = Set(

@@ -42,8 +42,9 @@ private[remote] object InboundEnvelope {
 /**
  * INTERNAL API
  */
-private[remote] trait InboundEnvelope extends NoSerializationVerificationNeeded {
-  def recipient: OptionVal[InternalActorRef]
+trait InboundEnvelope extends NoSerializationVerificationNeeded {
+  private[remote] def recipient: OptionVal[InternalActorRef]
+  def target: OptionVal[ActorRef] = recipient
   def sender: OptionVal[ActorRef]
   def originUid: Long
   def association: OptionVal[OutboundContext]
@@ -51,19 +52,19 @@ private[remote] trait InboundEnvelope extends NoSerializationVerificationNeeded 
   def serializer: Int
   def classManifest: String
   def message: AnyRef
-  def envelopeBuffer: EnvelopeBuffer
+  private[remote] def envelopeBuffer: EnvelopeBuffer
 
   def flags: Byte
-  def flag(byteFlag: ByteFlag): Boolean
+  private[remote] def flag(byteFlag: ByteFlag): Boolean
 
-  def withMessage(message: AnyRef): InboundEnvelope
+  private[remote] def withMessage(message: AnyRef): InboundEnvelope
 
-  def releaseEnvelopeBuffer(): InboundEnvelope
+  private[remote] def releaseEnvelopeBuffer(): InboundEnvelope
 
-  def withRecipient(ref: InternalActorRef): InboundEnvelope
+  private[remote] def withRecipient(ref: InternalActorRef): InboundEnvelope
 
   def lane: Int
-  def copyForLane(lane: Int): InboundEnvelope
+  private[remote] def copyForLane(lane: Int): InboundEnvelope
 }
 
 /**

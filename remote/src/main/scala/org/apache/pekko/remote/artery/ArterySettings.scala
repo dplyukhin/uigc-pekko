@@ -23,13 +23,15 @@ import com.typesafe.config.ConfigFactory
 
 import org.apache.pekko
 import pekko.NotUsed
-import pekko.stream.ActorMaterializerSettings
+import pekko.actor.{Address, ExtendedActorSystem}
+import pekko.stream.{ ActorMaterializerSettings, FlowShape }
 import pekko.util.Helpers.ConfigOps
 import pekko.util.Helpers.Requiring
 import pekko.util.Helpers.toRootLowerCase
 import pekko.util.WildcardIndex
 import pekko.util.ccompat.JavaConverters._
 import pekko.io.dns.internal.AsyncDnsResolver
+import pekko.stream.stage.GraphStage
 
 /** INTERNAL API */
 private[pekko] final class ArterySettings private (config: Config) {
@@ -118,6 +120,22 @@ private[pekko] final class ArterySettings private (config: Config) {
     @nowarn("msg=deprecated")
     val ControlStreamMaterializerSettings: ActorMaterializerSettings =
       ActorMaterializerSettings(config.getConfig("materializer")).withDispatcher(ControlStreamDispatcher)
+
+    def createIngress(system: ExtendedActorSystem, adjacent: Address): GraphStage[FlowShape[InboundEnvelope, InboundEnvelope]] = {
+      val clazzName = getString("ingress-stage")
+      val clazz = getClass.getClassLoader.loadClass(clazzName)
+      clazz.getDeclaredConstructor(classOf[ExtendedActorSystem], classOf[Address])
+        .newInstance(system, adjacent)
+        .asInstanceOf[GraphStage[FlowShape[InboundEnvelope, InboundEnvelope]]]
+    }
+
+    def createEgress(system: ExtendedActorSystem, adjacent: Address, outboundEnvelopePool: ObjectPool[ReusableOutboundEnvelope]): GraphStage[FlowShape[OutboundEnvelope, OutboundEnvelope]] = {
+      val clazzName = getString("egress-stage")
+      val clazz = getClass.getClassLoader.loadClass(clazzName)
+      clazz.getDeclaredConstructor(classOf[ExtendedActorSystem], classOf[Address], classOf[ObjectPool[ReusableOutboundEnvelope]])
+        .newInstance(system, adjacent, outboundEnvelopePool)
+        .asInstanceOf[GraphStage[FlowShape[OutboundEnvelope, OutboundEnvelope]]]
+    }
 
     val OutboundLanes: Int = getInt("outbound-lanes").requiring(n => n > 0, "outbound-lanes must be greater than zero")
     val InboundLanes: Int = getInt("inbound-lanes").requiring(n => n > 0, "inbound-lanes must be greater than zero")

@@ -26,7 +26,7 @@ import scala.util.control.NonFatal
 import org.apache.pekko
 import pekko.actor.dungeon.ChildrenContainer
 import pekko.annotation.{ InternalApi, InternalStableApi }
-import pekko.dispatch.{ Envelope, MessageDispatcher }
+import pekko.dispatch.{ Envelope, Mailbox, MessageDispatcher, MessageQueue }
 import pekko.dispatch.sysmsg._
 import pekko.event.Logging.{ Debug, Error, LogEvent }
 import pekko.japi.Procedure
@@ -56,6 +56,10 @@ import pekko.util.unused
  * Where no name is given explicitly, one will be automatically generated.
  */
 trait ActorContext extends ActorRefFactory with ClassicActorContextProvider {
+
+  private[pekko] def mailbox: Mailbox
+
+  def queue: MessageQueue = mailbox.messageQueue
 
   /**
    * The ActorRef representing this actor
