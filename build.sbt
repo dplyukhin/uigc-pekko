@@ -116,7 +116,13 @@ lazy val root = Project(id = "pekko", base = file("."))
   .enablePlugins(CopyrightHeaderForBuild)
 
 lazy val uigc = pekkoModule("uigc")
-  .dependsOn(actor, slf4j, actorTyped, cluster, clusterTyped)
+  .dependsOn(
+    actor % "compile->compile;test->test",
+    slf4j % "provided",
+    actorTyped % "compile->compile;test->test",
+    cluster % "compile->compile;test->test",
+    clusterTyped % "compile->compile;test->test"
+  )
   .settings(AutomaticModuleName.settings("pekko.uigc"))
   .settings(VersionGenerator.settings)
   .settings(serialversionRemoverPluginSettings)
