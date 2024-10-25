@@ -1,4 +1,4 @@
-name: Build and test Pekko with Scala 3
+name: Build and test Pekko with Scala 2.13
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions: {}
 
 concurrency:
   # Only run once for latest commit per ref and cancel other (previous) runs.
-  group: ci-scala3-${{ github.ref }}
+  group: ci-scala-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -38,17 +38,7 @@ jobs:
       - name: Enable jvm-opts
         run: cp .jvmopts-ci .jvmopts
 
-      - name: Compile and run tests on Scala 3
+      - name: Compile and run tests on Scala 2.13
         # note that this is not running any multi-jvm tests (yet) because multi-in-test=false
         run: |
-          sbt \
-          -Dpekko.log.timestamps=true \
-          -Dpekko.test.timefactor=2 \
-          -Dpekko.actor.testkit.typed.timefactor=2 \
-          -Dpekko.test.multi-in-test=false \
-          -Dpekko.test.tags.exclude=gh-exclude,timing \
-          -Dmultinode.XX:MetaspaceSize=128M \
-          -Dmultinode.Xms256M \
-          -Dmultinode.Xmx256M \
-          -Dmultinode.XX:+AlwaysActAsServerClassMachine \
-          "++ 3.x test"
+          sbt "++ 2.13 test"
