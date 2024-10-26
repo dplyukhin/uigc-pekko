@@ -14,10 +14,11 @@
 package org.apache.pekko.actor.typed.internal
 
 import scala.util.control.NonFatal
-
 import org.apache.pekko
 import pekko.annotation.InternalApi
 import pekko.util.OptionVal
+
+import scala.annotation.nowarn
 
 /**
  * INTERNAL API
@@ -26,6 +27,7 @@ import pekko.util.OptionVal
 private[pekko] object LoggerClass {
 
   // just to get access to the class context
+  @nowarn("cat=deprecation")
   private final class TrickySecurityManager extends SecurityManager {
     def getClassStack: Array[Class[_]] = getClassContext
   }
