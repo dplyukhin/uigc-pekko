@@ -19,6 +19,8 @@ ThisBuild / reproducibleBuildsCheckResolver := Resolver.ApacheMavenStagingRepo
 
 ThisBuild / pekkoCoreProject := true
 
+ThisBuild / version := "1.1.2-uigc-SNAPSHOT"
+
 enablePlugins(
   UnidocRoot,
   UnidocWithPrValidation,
