@@ -132,6 +132,8 @@ object Dependencies {
 
       val logback = Compile.logback % Test
 
+      val scalacheck = "org.scalacheck" %% "scalacheck" % scalaCheckVersion % Test
+
       val scalatest = "org.scalatest" %% "scalatest" % scalaTestVersion % Test
 
       // The 'scalaTestPlus' projects are independently versioned,
@@ -232,6 +234,10 @@ object Dependencies {
   val coordination = l ++= Seq(TestDependencies.junit, TestDependencies.scalatest)
 
   val testkit = l ++= Seq(TestDependencies.junit, TestDependencies.scalatest) ++ TestDependencies.metricsAll
+
+  val uigcTests = l ++= Seq(
+    TestDependencies.scalacheck
+  )
 
   // TestDependencies.dockerClient brings in older versions of jackson libs that have CVEs
   val actorTests = l ++= Seq(

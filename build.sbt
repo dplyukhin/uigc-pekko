@@ -115,19 +115,6 @@ lazy val root = Project(id = "pekko", base = file("."))
   .settings(PekkoBuild.welcomeSettings)
   .enablePlugins(CopyrightHeaderForBuild)
 
-lazy val uigc = pekkoModule("uigc")
-  .dependsOn(
-    actor % "compile->compile;test->test",
-    slf4j % "provided",
-    actorTyped % "compile->compile;test->test",
-    cluster % "compile->compile;test->test",
-    clusterTyped % "compile->compile;test->test"
-  )
-  .settings(AutomaticModuleName.settings("pekko.uigc"))
-  .settings(VersionGenerator.settings)
-  .settings(serialversionRemoverPluginSettings)
-  .enablePlugins(BoilerplatePlugin, SbtOsgi, Jdk9)
-
 lazy val actor = pekkoModule("actor")
   .settings(Dependencies.actor)
   .settings(OSGi.actor)
@@ -136,6 +123,17 @@ lazy val actor = pekkoModule("actor")
   .settings(VersionGenerator.settings)
   .settings(serialversionRemoverPluginSettings)
   .enablePlugins(BoilerplatePlugin, SbtOsgi, Jdk9)
+
+lazy val uigc = pekkoModule("uigc")
+  .dependsOn(
+    actor % "compile->compile",
+    actorTyped % "compile->compile",
+    stream % "compile->compile",
+    remote % "compile->compile",
+    cluster % "compile->compile",
+    actorTestkitTyped % "compile->test",
+  )
+  .settings(Dependencies.uigcTests)
 
 lazy val actorTests = pekkoModule("actor-tests")
   .configs(Jdk9.TestJdk9)
