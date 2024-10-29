@@ -1,8 +1,7 @@
-package actor.typed.engines.crgc
+package org.apache.pekko.uigc.engines.crgc
 
 import org.apache.pekko.actor.Address
 import org.apache.pekko.actor.testkit.typed.scaladsl.{ScalaTestWithActorTestKit, TestProbe}
-import org.apache.pekko.uigc.actor
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.jdk.CollectionConverters._

@@ -1,11 +1,10 @@
-package actor.typed
+package org.apache.pekko.uigc
 
 import org.apache.pekko.actor.testkit.typed.scaladsl.{ScalaTestWithActorTestKit, TestProbe}
 import org.apache.pekko.actor.typed.{PostStop, Signal, Behavior => AkkaBehavior}
-import org.apache.pekko.uigc.actor
-import org.apache.pekko.uigc.actor.typed.actor.typed.AbstractBehavior
-import org.apache.pekko.uigc.actor.typed.actor.typed.scaladsl.{ActorContext, Behaviors}
-import org.apache.pekko.uigc.actor.typed.interfaces.{Message, NoRefs}
+import org.apache.pekko.uigc.actor.typed.{AbstractBehavior, ActorRef}
+import org.apache.pekko.uigc.actor.typed.scaladsl.{ActorContext, Behaviors}
+import org.apache.pekko.uigc.interfaces.{Message, NoRefs}
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.duration.{Duration, DurationInt}
@@ -20,8 +19,8 @@ object ManyMessagesSpec {
   final case object Terminated extends Msg with NoRefs
   final case object DoneSendingMessages extends Msg with NoRefs
   final case object DoneReceivingMessages extends Msg with NoRefs
-  final case class NewAcquaintance(actorB: interfaces.ActorRef[Msg]) extends Msg {
-    override def refs: Iterable[interfaces.ActorRef[Nothing]] = Some(actorB)
+  final case class NewAcquaintance(actorB: ActorRef[Msg]) extends Msg {
+    override def refs: Iterable[ActorRef[Nothing]] = Some(actorB)
   }
 }
 
@@ -50,10 +49,10 @@ class ManyMessagesSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
       Behaviors.setupRoot(context => new Root(context))
   }
   class Root(context: ActorContext[Msg]) extends AbstractBehavior[Msg](context) {
-    val actorA: interfaces.ActorRef[Msg] = context.spawn(ActorA(), "actorA")
-    val actorB: interfaces.ActorRef[Msg] = context.spawn(ActorB(), "actorB")
+    val actorA: ActorRef[Msg] = context.spawn(ActorA(), "actorA")
+    val actorB: ActorRef[Msg] = context.spawn(ActorB(), "actorB")
     actorA ! NewAcquaintance(context.createRef(actorB, actorA))
-    context.release(actorA, actorB)
+    //context.release(actorA, actorB)
 
     override def onMessage(msg: Msg): Behavior[Msg] = {
       this

@@ -1,12 +1,11 @@
-package uigc.actor.typed
+package org.apache.pekko.uigc
 
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.{PostStop, Signal}
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
-import org.apache.pekko.uigc
-import org.apache.pekko.uigc.actor.typed.actor.typed.AbstractBehavior
-import org.apache.pekko.uigc.actor.typed.actor.typed.scaladsl.{ActorContext, Behaviors}
-import org.apache.pekko.uigc.actor.typed.interfaces.Message
+import org.apache.pekko.uigc.actor.typed.AbstractBehavior
+import org.apache.pekko.uigc.actor.typed.scaladsl.{ActorContext, Behaviors}
+import org.apache.pekko.uigc.interfaces.Message
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import java.util.concurrent.{CountDownLatch, TimeUnit}

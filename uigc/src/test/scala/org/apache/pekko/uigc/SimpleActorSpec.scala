@@ -1,12 +1,11 @@
-package actor.typed
+package org.apache.pekko.uigc
 
 import org.apache.pekko.actor.testkit.typed.scaladsl.{ScalaTestWithActorTestKit, TestProbe}
 import org.apache.pekko.actor.typed.{PostStop, Signal}
-import org.apache.pekko.uigc.actor
-import org.apache.pekko.uigc.actor.typed.actor.typed.AbstractBehavior
-import org.apache.pekko.uigc.actor.typed.actor.typed.scaladsl.{ActorContext, Behaviors}
+import org.apache.pekko.uigc.actor.typed.AbstractBehavior
+import org.apache.pekko.uigc.actor.typed.scaladsl.{ActorContext, Behaviors}
 import org.scalatest.wordspec.AnyWordSpecLike
-import org.apache.pekko.uigc.actor.typed.interfaces.{Message, NoRefs}
+import org.apache.pekko.uigc.interfaces.{Message, NoRefs}
 
 class SimpleActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
 
