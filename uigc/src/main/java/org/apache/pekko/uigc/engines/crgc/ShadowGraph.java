@@ -20,13 +20,13 @@ public class ShadowGraph {
         this.context = context;
     }
 
-    public Shadow getShadow(Refob<?> refob) {
+    public Shadow getShadow(WrappedActorRef refob) {
         // Check if it's in the cache. This saves us an expensive hash table lookup.
         if (refob.targetShadow() != null)
             return refob.targetShadow();
 
         // Try to get it from the collection of all my shadows. Save it in the cache.
-        Shadow shadow = getShadow(refob.target().classicRef());
+        Shadow shadow = getShadow(refob.target());
         refob.targetShadow_$eq(shadow);
 
         return shadow;
@@ -84,7 +84,7 @@ public class ShadowGraph {
         // Created refs.
         for (int i = 0; i < context.EntryFieldSize; i++) {
             if (entry.createdOwners[i] == null) break;
-            Refob<?> owner = entry.createdOwners[i];
+            WrappedActorRef owner = entry.createdOwners[i];
             Shadow targetShadow = getShadow(entry.createdTargets[i]);
 
             // Increment the number of outgoing refs to the target
@@ -95,7 +95,7 @@ public class ShadowGraph {
         // Spawned actors.
         for (int i = 0; i < context.EntryFieldSize; i++) {
             if (entry.spawnedActors[i] == null) break;
-            Refob<?> child = entry.spawnedActors[i];
+            WrappedActorRef child = entry.spawnedActors[i];
 
             // Set the child's supervisor field
             Shadow childShadow = getShadow(child);
@@ -106,7 +106,7 @@ public class ShadowGraph {
         // Update refs.
         for (int i = 0; i < context.EntryFieldSize; i++) {
             if (entry.updatedRefs[i] == null) break;
-            Refob<?> target = entry.updatedRefs[i];
+            WrappedActorRef target = entry.updatedRefs[i];
             Shadow targetShadow = getShadow(target);
             short info = entry.updatedInfos[i];
             short sendCount = RefobInfo.count(info);

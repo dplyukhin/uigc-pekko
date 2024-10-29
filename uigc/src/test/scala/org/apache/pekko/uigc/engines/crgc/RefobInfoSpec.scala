@@ -1,5 +1,6 @@
-package org.apache.pekko.uigc.engines.crgc
+package typed.engines.crgc
 
+import org.apache.pekko.uigc.actor.typed
 import org.scalacheck.Prop.forAllNoShrink
 import org.scalacheck._
 

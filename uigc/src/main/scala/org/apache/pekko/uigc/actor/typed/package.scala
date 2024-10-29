@@ -1,14 +1,9 @@
-package org.apache.pekko
+package org.apache.pekko.uigc.actor
 
-import org.apache.pekko.uigc.interfaces._
 
-package object uigc {
+import org.apache.pekko.uigc.interfaces.{GCMessage, SpawnInfo}
 
-  type ActorRef[-T] = Refob[T]
-
-  type Behavior[T] = unmanaged.Behavior[GCMessage[T]]
-
-  type ActorName = unmanaged.ActorRef[Nothing]
+package object typed {
 
   /** A recipe for spawning a garbage-collected actor. Similar to [[Behavior]], but this recipe can
     * only be used by *GC-aware* actors,

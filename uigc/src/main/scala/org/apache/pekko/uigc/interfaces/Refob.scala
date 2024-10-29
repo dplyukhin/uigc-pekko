@@ -1,7 +1,8 @@
 package org.apache.pekko.uigc.interfaces
 
 import org.apache.pekko.actor.typed.ActorRef
-import org.apache.pekko.uigc.ActorContext
+import org.apache.pekko.uigc.actor
+import org.apache.pekko.uigc.actor.typed.actor.typed.scaladsl.ActorContext
 
 import scala.annotation.unchecked.uncheckedVariance
 

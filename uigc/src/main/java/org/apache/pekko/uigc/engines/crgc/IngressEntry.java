@@ -88,13 +88,13 @@ public class IngressEntry implements Serializable {
     private static final Function<ActorRef, Field> createField = k -> new Field();
     private static final BiFunction<ActorRef, Integer, Integer> incRefCount = (k, v) -> v == null ? 1 : v + 1;
 
-    public void onMessage(ActorRef recipient, Iterable<Refob<?>> refs) {
+    public void onMessage(ActorRef recipient, Iterable<WrappedActorRef> refs) {
         Field field = this.admitted.computeIfAbsent(recipient, createField);
         // Increase message count.
         field.messageCount += 1;
         // For each ref in the message, add to createdRefs.
-        for (Refob<?> refob : refs) {
-            ActorRef target = refob.target().classicRef();
+        for (WrappedActorRef refob : refs) {
+            ActorRef target = refob.target();
             field.createdRefs.compute(target, incRefCount);
         }
     }

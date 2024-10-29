@@ -1,9 +1,12 @@
-package org.apache.pekko.uigc
+package uigc.actor.typed
 
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.{PostStop, Signal}
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
-import org.apache.pekko.uigc.interfaces.Message
+import org.apache.pekko.uigc
+import org.apache.pekko.uigc.actor.typed.actor.typed.AbstractBehavior
+import org.apache.pekko.uigc.actor.typed.actor.typed.scaladsl.{ActorContext, Behaviors}
+import org.apache.pekko.uigc.actor.typed.interfaces.Message
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import java.util.concurrent.{CountDownLatch, TimeUnit}
@@ -19,8 +22,8 @@ object RandomSpec {
 
   sealed trait Msg extends Message
 
-  final case class Link(ref: ActorRef[Msg]) extends Msg {
-    def refs: Seq[ActorRef[Msg]] = Seq(ref)
+  final case class Link(ref: interfaces.ActorRef[Msg]) extends Msg {
+    def refs: Seq[interfaces.ActorRef[Msg]] = Seq(ref)
   }
 
   final case class Ping() extends Msg {
@@ -40,7 +43,7 @@ class RandomSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
       timers: TimerScheduler[Msg]
   ) extends AbstractBehavior[Msg](context) {
 
-    private var acquaintances: Set[ActorRef[Msg]] = Set()
+    private var acquaintances: Set[interfaces.ActorRef[Msg]] = Set()
 
     override def onMessage(msg: Msg): Behavior[Msg] =
       msg match {

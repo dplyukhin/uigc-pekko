@@ -1,11 +1,12 @@
-package org.apache.pekko.uigc
+package org.apache.pekko.uigc.actor.typed.scaladsl
 
 import org.apache.pekko.actor.typed
 import org.apache.pekko.actor.typed.scaladsl
 import org.apache.pekko.actor.typed.scaladsl.AskPattern.{Askable, schedulerFromActorSystem}
-import org.apache.pekko.util.Timeout
 import org.apache.pekko.uigc.engines.Engine
 import org.apache.pekko.uigc.interfaces._
+import org.apache.pekko.uigc.actor.typed.{ActorRef, _}
+import org.apache.pekko.util.Timeout
 
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{Await, Future}
@@ -23,9 +24,9 @@ class ActorContext[T](
 
   private[uigc] val engine: Engine = UIGC(typedContext.system)
 
-  private[uigc] val state: State = engine.initState(typedContext, spawnInfo)
+  private[uigc] val state: State = engine.initState(typedContext.classicActorContext, spawnInfo)
 
-  val self: ActorRef[T] = engine.getSelfRef(state, typedContext)
+  val self: ActorRef[T] = engine.getSelfRef(state, typedContext.classicActorContext)
 
   def name: ActorName = typedContext.self
 
@@ -43,7 +44,7 @@ class ActorContext[T](
     *   An [[ActorRef]] for the spawned actor.
     */
   def spawn[S](factory: ActorFactory[S], name: String): ActorRef[S] =
-    engine.spawn(info => typedContext.spawn(factory(info), name), state, typedContext)
+    engine.spawn(info => typedContext.spawn(factory(info), name).classicRef, state, typedContext.classicActorContext)
 
   def spawnRemote[S](
       factory: String,
@@ -61,7 +62,7 @@ class ActorContext[T](
       Await.result[unmanaged.ActorRef[GCMessage[S]]](f, Duration.Inf)
     }
 
-    engine.spawn(info => spawnIt(info), state, typedContext)
+    engine.spawn(info => spawnIt(info).classicRef, state, typedContext.classicActorContext)
   }
 
   /** Spawn a new anonymous actor into the GC system.
@@ -74,7 +75,7 @@ class ActorContext[T](
     *   An [[ActorRef]] for the spawned actor.
     */
   def spawnAnonymous[S](factory: ActorFactory[S]): ActorRef[S] =
-    engine.spawn(info => typedContext.spawnAnonymous(factory(info)), state, typedContext)
+    engine.spawn(info => typedContext.spawnAnonymous(factory(info)).classicRef, state, typedContext.classicActorContext)
 
   /** Creates a reference to an actor to be sent to another actor and adds it to the created
     * collection. e.g. A has x: A->B and y: A->C. A could create z: B->C using y and send it to B
@@ -90,7 +91,7 @@ class ActorContext[T](
     *   The created reference.
     */
   def createRef[S](target: ActorRef[S], owner: ActorRef[Nothing]): ActorRef[S] =
-    engine.createRef(target, owner, state, typedContext)
+    engine.createRef(target, owner, state, typedContext.classicActorContext)
 
   /** Releases a collection of references from an actor.
     */

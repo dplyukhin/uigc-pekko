@@ -1,115 +1,101 @@
 package org.apache.pekko.uigc.engines
 
-import org.apache.pekko.actor.ExtendedActorSystem
-import org.apache.pekko.actor.typed.scaladsl.ActorContext
-import org.apache.pekko.actor.typed.{ActorRef, Signal}
-import org.apache.pekko.uigc.interfaces
+import org.apache.pekko.actor
+import org.apache.pekko.uigc.{interfaces => uigc}
 
 object Manual {
-  trait SpawnInfo extends interfaces.SpawnInfo
+  trait SpawnInfo extends uigc.SpawnInfo
 
-  case class GCMessage[+T](payload: T, refs: Iterable[Refob[Nothing]])
-      extends interfaces.GCMessage[T]
+  case class GCMessage[+T](payload: T, refs: Iterable[WrappedActorRef]) extends uigc.GCMessage[T]
 
-  case class Refob[-T](target: ActorRef[GCMessage[T]]) extends interfaces.Refob[T] {
-    override def typedActorRef: ActorRef[interfaces.GCMessage[T]] =
-      target.asInstanceOf[ActorRef[interfaces.GCMessage[T]]]
-  }
+  case class WrappedActorRef(target: actor.ActorRef) extends uigc.ActorRef
 
-  case class Info() extends SpawnInfo
+  case object Info extends SpawnInfo
 
-  class State(
-      val selfRef: Refob[Nothing]
-  ) extends interfaces.State
+  class State(val selfRef: WrappedActorRef) extends uigc.State
 }
 
-class Manual(system: ExtendedActorSystem) extends Engine {
+class Manual extends Engine {
   import Manual._
 
-  override type GCMessageImpl[+T] = Manual.GCMessage[T]
-  override type RefobImpl[-T] = Manual.Refob[T]
+  override type ActorRefImpl = Manual.WrappedActorRef
+  override type GCMessageImpl[T] = Manual.GCMessage[T]
   override type SpawnInfoImpl = Manual.SpawnInfo
   override type StateImpl = Manual.State
 
   /** Transform a message from a non-GC actor so that it can be understood by a GC actor.
     * Necessarily, the recipient is a root actor.
     */
-  def rootMessageImpl[T](payload: T, refs: Iterable[Refob[Nothing]]): GCMessage[T] =
+  override def rootMessageImpl[T](payload: T, refs: Iterable[ActorRefImpl]): GCMessage[T] =
     GCMessage(payload, refs)
 
   /** Produces SpawnInfo indicating to the actor that it is a root actor.
     */
-  def rootSpawnInfoImpl(): SpawnInfo = Info()
+  def rootSpawnInfoImpl(): SpawnInfo = Info
 
-  override def toRefobImpl[T](ref: ActorRef[GCMessage[T]]): Refob[T] =
-    Refob(ref)
+  override def initStateImpl(context: actor.ActorContext, spawnInfo: SpawnInfo): State =
+    new State(WrappedActorRef(context.self))
 
-  def initStateImpl[T](
-      context: ActorContext[GCMessage[T]],
-      spawnInfo: SpawnInfo
-  ): State =
-    new State(Refob(context.self))
-
-  override def getSelfRefImpl[T](
+  override def getSelfRefImpl(
       state: State,
-      context: ActorContext[GCMessage[T]]
-  ): Refob[T] =
-    state.selfRef.asInstanceOf[Refob[T]]
+      context: actor.ActorContext
+  ): WrappedActorRef =
+    state.selfRef
 
-  override def spawnImpl[S, T](
-      factory: SpawnInfo => ActorRef[GCMessage[S]],
+  override def spawnImpl(
+      factory: SpawnInfo => actor.ActorRef,
       state: State,
-      ctx: ActorContext[GCMessage[T]]
-  ): Refob[S] =
-    Refob(factory(Info()))
+      ctx: actor.ActorContext
+  ): WrappedActorRef =
+    WrappedActorRef(factory(Info))
 
-  override def onMessageImpl[T](
+  override def preMessageImpl[T](
       msg: GCMessage[T],
       state: State,
-      ctx: ActorContext[GCMessage[T]]
+      ctx: actor.ActorContext
   ): Option[T] =
     Some(msg.payload)
 
-  override def onIdleImpl[T](
+  override def postMessageImpl[T](
       msg: GCMessage[T],
       state: State,
-      ctx: ActorContext[GCMessage[T]]
+      ctx: actor.ActorContext
   ): Engine.TerminationDecision =
     Engine.ShouldContinue
 
-  override def preSignalImpl[T](
-      signal: Signal,
+  override def preSignalImpl(
+      signal: Any,
       state: State,
-      ctx: ActorContext[GCMessage[T]]
+      ctx: actor.ActorContext
   ): Unit = ()
 
-  override def postSignalImpl[T](
-      signal: Signal,
+  override def postSignalImpl(
+      signal: Any,
       state: State,
-      ctx: ActorContext[GCMessage[T]]
+      ctx: actor.ActorContext
   ): Engine.TerminationDecision =
     Engine.Unhandled
 
-  override def createRefImpl[S, T](
-      target: Refob[S],
-      owner: Refob[Nothing],
+  override def createRefImpl(
+      target: WrappedActorRef,
+      owner: WrappedActorRef,
       state: State,
-      ctx: ActorContext[GCMessage[T]]
-  ): Refob[S] =
-    Refob(target.target)
+      ctx: actor.ActorContext
+  ): WrappedActorRef =
+    WrappedActorRef(target.target)
 
-  override def releaseImpl[S, T](
-      releasing: Iterable[Refob[S]],
+  override def releaseImpl(
+      releasing: WrappedActorRef,
       state: State,
-      ctx: ActorContext[GCMessage[T]]
+      ctx: actor.ActorContext
   ): Unit = ()
 
-  override def sendMessageImpl[T, S](
-      ref: Refob[T],
-      msg: T,
-      refs: Iterable[Refob[Nothing]],
+  override def sendMessageImpl(
+      ref: WrappedActorRef,
+      msg: Any,
+      refs: Iterable[WrappedActorRef],
       state: State,
-      ctx: ActorContext[GCMessage[S]]
+      ctx: actor.ActorContext
   ): Unit =
     ref.target ! GCMessage(msg, refs)
 

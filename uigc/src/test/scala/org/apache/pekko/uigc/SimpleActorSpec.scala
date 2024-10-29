@@ -1,9 +1,12 @@
-package org.apache.pekko.uigc
+package actor.typed
 
 import org.apache.pekko.actor.testkit.typed.scaladsl.{ScalaTestWithActorTestKit, TestProbe}
 import org.apache.pekko.actor.typed.{PostStop, Signal}
+import org.apache.pekko.uigc.actor
+import org.apache.pekko.uigc.actor.typed.actor.typed.AbstractBehavior
+import org.apache.pekko.uigc.actor.typed.actor.typed.scaladsl.{ActorContext, Behaviors}
 import org.scalatest.wordspec.AnyWordSpecLike
-import org.apache.pekko.uigc.interfaces.{Message, NoRefs}
+import org.apache.pekko.uigc.actor.typed.interfaces.{Message, NoRefs}
 
 class SimpleActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
 
@@ -17,8 +20,8 @@ class SimpleActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
   case object Hello extends TestMessage with NoRefs
   case class Spawned(name: ActorName) extends TestMessage with NoRefs
   case object Terminated extends TestMessage with NoRefs
-  case class GetRef(ref: ActorRef[TestMessage]) extends TestMessage with Message {
-    override def refs: Iterable[ActorRef[Nothing]] = Iterable(ref)
+  case class GetRef(ref: interfaces.ActorRef[TestMessage]) extends TestMessage with Message {
+    override def refs: Iterable[interfaces.ActorRef[Nothing]] = Iterable(ref)
   }
 
   val probe: TestProbe[TestMessage] = testKit.createTestProbe[TestMessage]()
@@ -75,8 +78,8 @@ class SimpleActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
   }
 
   class ActorA(context: ActorContext[TestMessage]) extends AbstractBehavior[TestMessage](context) {
-    var actorB: ActorRef[TestMessage] = _
-    var actorC: ActorRef[TestMessage] = _
+    var actorB: interfaces.ActorRef[TestMessage] = _
+    var actorC: interfaces.ActorRef[TestMessage] = _
     override def onMessage(msg: TestMessage): Behavior[TestMessage] = {
       msg match {
         case Init =>
@@ -104,7 +107,7 @@ class SimpleActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
     }
   }
   class ActorB(context: ActorContext[TestMessage]) extends AbstractBehavior[TestMessage](context) {
-    var actorC: ActorRef[TestMessage]= _
+    var actorC: interfaces.ActorRef[TestMessage]= _
     probe.ref ! Spawned(context.name)
     override def onMessage(msg: TestMessage): Behavior[TestMessage] = {
       msg match {

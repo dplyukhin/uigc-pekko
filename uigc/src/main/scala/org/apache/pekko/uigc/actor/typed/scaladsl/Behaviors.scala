@@ -1,10 +1,12 @@
-package org.apache.pekko.uigc
+package actor.typed.actor.typed.scaladsl
 
 import org.apache.pekko.actor.typed
 import org.apache.pekko.actor.typed.BehaviorInterceptor.ReceiveTarget
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
 import org.apache.pekko.actor.typed.{BehaviorInterceptor, TypedActorContext, scaladsl}
+import org.apache.pekko.uigc.UIGC
 import org.apache.pekko.uigc.interfaces._
+import org.apache.pekko.uigc.actor.typed.{ActorFactory, Behavior}
 
 import scala.reflect.ClassTag
 

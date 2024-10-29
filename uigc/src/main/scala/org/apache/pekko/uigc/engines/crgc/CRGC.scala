@@ -1,7 +1,6 @@
 package org.apache.pekko.uigc.engines.crgc
 
-import org.apache.pekko.actor.typed.scaladsl.ActorContext
-import org.apache.pekko.actor.typed.{ActorRef, Signal}
+import org.apache.pekko.actor
 import org.apache.pekko.actor.{Address, ExtendedActorSystem}
 import org.apache.pekko.remote.artery.{InboundEnvelope, ObjectPool, OutboundEnvelope, ReusableOutboundEnvelope}
 import org.apache.pekko.stream.stage.GraphStageLogic
@@ -9,7 +8,7 @@ import org.apache.pekko.stream.{FlowShape, Inlet, Outlet}
 import com.typesafe.config.Config
 import org.apache.pekko.uigc.engines.crgc.jfr.EntrySendEvent
 import org.apache.pekko.uigc.engines.{Engine, crgc}
-import org.apache.pekko.uigc.interfaces
+import org.apache.pekko.uigc.{interfaces => uigc}
 
 import java.util.concurrent.ConcurrentLinkedQueue
 
@@ -20,8 +19,8 @@ object CRGC {
   trait CollectionStyle
 
   class SpawnInfo(
-      var creator: Option[Refob[Nothing]]
-  ) extends interfaces.SpawnInfo with Serializable
+      var creator: Option[WrappedActorRef]
+  ) extends uigc.SpawnInfo with Serializable
 
   case object Wave extends CollectionStyle
 
@@ -35,7 +34,7 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
   import CRGC._
 
   override type GCMessageImpl[+T] = crgc.GCMessage[T]
-  override type RefobImpl[-T] = crgc.Refob[T]
+  override type ActorRefImpl = crgc.WrappedActorRef
   override type SpawnInfoImpl = SpawnInfo
   override type StateImpl = crgc.State
 
@@ -57,21 +56,18 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
       "Bookkeeper"
     )
 
-  override def rootMessageImpl[T](payload: T, refs: Iterable[Refob[Nothing]]): GCMessage[T] =
+  override def rootMessageImpl[T](payload: T, refs: Iterable[WrappedActorRef]): GCMessage[T] =
     AppMsg(payload, refs)
 
   override def rootSpawnInfoImpl(): SpawnInfo =
     new SpawnInfo(None)
 
-  override def toRefobImpl[T](ref: ActorRef[GCMessage[T]]): Refob[T] =
-    new Refob[T](ref, targetShadow = null)
-
-  override def initStateImpl[T](
-      context: ActorContext[GCMessage[T]],
+  override def initStateImpl(
+      context: actor.ActorContext,
       spawnInfo: SpawnInfo
   ): State = {
     val self = context.self
-    val selfRefob = new Refob[Nothing](self, targetShadow = null)
+    val selfRefob = new WrappedActorRef(self, targetShadow = null)
     val state = new State(selfRefob, crgcContext)
     state.recordNewRefob(selfRefob, selfRefob)
     spawnInfo.creator match {
@@ -91,19 +87,19 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
     state
   }
 
-  override def getSelfRefImpl[T](
+  override def getSelfRefImpl(
       state: State,
-      context: ActorContext[GCMessage[T]]
-  ): Refob[T] =
-    state.self.asInstanceOf[Refob[T]]
+      context: actor.ActorContext
+  ): WrappedActorRef =
+    state.self.asInstanceOf[WrappedActorRef]
 
-  override def spawnImpl[S, T](
-      factory: SpawnInfo => ActorRef[GCMessage[S]],
+  override def spawnImpl(
+      factory: SpawnInfo => actor.ActorRef,
       state: State,
-      ctx: ActorContext[GCMessage[T]]
-  ): Refob[S] = {
+      ctx: actor.ActorContext
+  ): WrappedActorRef = {
     val child = factory(new SpawnInfo(Some(state.self)))
-    val ref = new Refob[S](child, null)
+    val ref = new WrappedActorRef(child, null)
     // NB: "onCreate" is only updated at the child, not the parent.
     if (!state.canRecordNewActor)
       sendEntry(state, isBusy=true)
@@ -111,10 +107,10 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
     ref
   }
 
-  override def onMessageImpl[T](
+  override def preMessageImpl[T](
       msg: GCMessage[T],
       state: State,
-      ctx: ActorContext[GCMessage[T]]
+      ctx: actor.ActorContext
   ): Option[T] =
     msg match {
       case AppMsg(payload, _) =>
@@ -126,10 +122,10 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
         None
     }
 
-  override def onIdleImpl[T](
+  override def postMessageImpl[T](
       msg: GCMessage[T],
       state: State,
-      ctx: ActorContext[GCMessage[T]]
+      ctx: actor.ActorContext
   ): Engine.TerminationDecision =
     msg match {
       case StopMsg =>
@@ -139,7 +135,7 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
         val it = ctx.children.iterator
         while (it.hasNext) {
           val child = it.next()
-          child.unsafeUpcast[GCMessage[Any]].tell(WaveMsg)
+          child.tell(WaveMsg)
         }
         Engine.ShouldContinue
       case _ =>
@@ -148,32 +144,28 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
         Engine.ShouldContinue
     }
 
-  override def createRefImpl[S, T](
-      target: Refob[S],
-      owner: Refob[Nothing],
-      state: State,
-      ctx: ActorContext[GCMessage[T]]
-  ): Refob[S] = {
-    val ref = new Refob[S](target.target, target.targetShadow)
+  override def createRefImpl(
+                                    target: WrappedActorRef,
+                                    owner: WrappedActorRef,
+                                    state: State,
+                                    ctx: actor.ActorContext
+  ): WrappedActorRef = {
+    val ref = new WrappedActorRef(target.target, target.targetShadow)
     if (!state.canRecordNewRefob)
       sendEntry(state, isBusy=true)
     state.recordNewRefob(owner, target)
     ref
   }
 
-  override def releaseImpl[S, T](
-      releasing: Iterable[Refob[S]],
-      state: State,
-      ctx: ActorContext[GCMessage[T]]
+  override def releaseImpl(
+                                  ref: WrappedActorRef,
+                                  state: State,
+                                  ctx: actor.ActorContext
   ): Unit = {
-    val it = releasing.iterator
-    while (it.hasNext) {
-      val ref = it.next()
-      if (!state.canRecordUpdatedRefob(ref))
-        sendEntry(state, isBusy=true)
-      ref.deactivate()
-      state.recordUpdatedRefob(ref)
-    }
+    if (!state.canRecordUpdatedRefob(ref))
+      sendEntry(state, isBusy=true)
+    ref.deactivate()
+    state.recordUpdatedRefob(ref)
   }
 
   private def sendEntry(
@@ -192,25 +184,25 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
     metrics.commit()
   }
 
-  override def preSignalImpl[T](
-      signal: Signal,
+  override def preSignalImpl(
+      signal: Any,
       state: State,
-      ctx: ActorContext[GCMessage[T]]
+      ctx: actor.ActorContext
   ): Unit = ()
 
-  override def postSignalImpl[T](
-      signal: Signal,
+  override def postSignalImpl(
+      signal: Any,
       state: State,
-      ctx: ActorContext[GCMessage[T]]
+      ctx: actor.ActorContext
   ): Engine.TerminationDecision =
     Engine.Unhandled
 
-  override def sendMessageImpl[T, S](
-      ref: Refob[T],
-      msg: T,
-      refs: Iterable[Refob[Nothing]],
-      state: State,
-      ctx: ActorContext[GCMessage[S]]
+  override def sendMessageImpl(
+                                      ref: WrappedActorRef,
+                                      msg: Any,
+                                      refs: Iterable[WrappedActorRef],
+                                      state: State,
+                                      ctx: actor.ActorContext
   ): Unit = {
     if (!ref.canIncSendCount || !state.canRecordUpdatedRefob(ref))
       sendEntry(state, isBusy=true)

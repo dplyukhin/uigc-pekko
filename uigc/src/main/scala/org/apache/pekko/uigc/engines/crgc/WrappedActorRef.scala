@@ -1,21 +1,19 @@
 package org.apache.pekko.uigc.engines.crgc
 
-import org.apache.pekko.actor.typed.ActorRef
-import org.apache.pekko.uigc.interfaces
+import org.apache.pekko.actor
+import org.apache.pekko.uigc.{interfaces => uigc}
 
 import java.io.{IOException, ObjectInputStream, ObjectOutputStream}
-import scala.annotation.unchecked.uncheckedVariance
 
-class Refob[-T](
-    var target: ActorRef[GCMessage[T]] @uncheckedVariance,
-    // This is really a val, so the variance is correct---but we write to it (safely) in the deserializer.
+class WrappedActorRef(
+    var target: actor.ActorRef,
     @volatile var targetShadow: Shadow
     // This field is read by actors that create new refobs and written-to by
     // the GC. Adding @volatile makes it more likely that the parent actor will
     // get the GC's version of the shadow. But it's also okay if the parent actor
     // reads a stale value of this field. We can remove @volatile if it worsens
     // performance.
-) extends interfaces.Refob[T]
+) extends uigc.ActorRef
     with Serializable {
 
   private var _hasBeenRecorded: Boolean = false
@@ -48,7 +46,7 @@ class Refob[-T](
 
   override def equals(that: Any): Boolean =
     that match {
-      case that: Refob[_] => this.target == that.target
+      case that: WrappedActorRef => this.target == that.target
       case _              => false
     }
 
@@ -61,10 +59,7 @@ class Refob[-T](
 
   @throws(classOf[IOException])
   private def readObject(in: ObjectInputStream): Unit = {
-    this.target = in.readObject().asInstanceOf[ActorRef[GCMessage[T]]]
+    this.target = in.readObject().asInstanceOf[actor.ActorRef]
     this.targetShadow = null
   }
-
-  override def typedActorRef: ActorRef[interfaces.GCMessage[T]] =
-    target.asInstanceOf[ActorRef[interfaces.GCMessage[T]]]
 }

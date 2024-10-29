@@ -14,7 +14,7 @@ object UIGC extends ExtensionId[Engine] with ExtensionIdProvider {
     config.getString("uigc.engine") match {
       case "crgc"   => new CRGC(system)
       case "mac"    => new MAC(system)
-      case "manual" => new Manual(system)
+      case "manual" => new Manual
     }
   }
 

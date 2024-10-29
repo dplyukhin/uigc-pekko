@@ -1,7 +1,7 @@
 package org.apache.pekko.uigc.interfaces
 
 trait Message {
-  def refs: Iterable[Refob[Nothing]]
+  def refs: Iterable[ActorRef]
 }
 
 trait NoRefs extends Message {

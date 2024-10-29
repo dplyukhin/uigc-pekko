@@ -1,8 +1,11 @@
-package org.apache.pekko.uigc
+package actor.typed.actor.typed
 
 import org.apache.pekko.actor.typed.{ExtensibleBehavior, Signal, TypedActorContext, scaladsl}
-import org.apache.pekko.uigc.engines.Engine
-import org.apache.pekko.uigc.interfaces._
+import org.apache.pekko.uigc.actor
+import org.apache.pekko.uigc.actor.typed.engines.Engine
+import org.apache.pekko.uigc.actor.typed.interfaces._
+import org.apache.pekko.uigc.actor.typed.Behavior
+import org.apache.pekko.uigc.actor.typed.actor.typed.scaladsl.ActorContext
 
 abstract class AbstractBehavior[T](context: ActorContext[T])
     extends ExtensibleBehavior[GCMessage[T]] {
@@ -17,14 +20,14 @@ abstract class AbstractBehavior[T](context: ActorContext[T])
       ctx: TypedActorContext[GCMessage[T]],
       msg: GCMessage[T]
   ): Behavior[T] = {
-    val appMsg = context.engine.onMessage(msg, context.state, context.typedContext)
+    val appMsg = context.engine.preMessage(msg, context.state, context.typedContext.classicActorContext)
 
     val result = appMsg match {
       case Some(msg) => onMessage(msg)
       case None      => scaladsl.Behaviors.same[GCMessage[T]]
     }
 
-    context.engine.onIdle(msg, context.state, context.typedContext) match {
+    context.engine.postMessage(msg, context.state, context.typedContext.classicActorContext) match {
       case _: Engine.ShouldStop.type     => scaladsl.Behaviors.stopped
       case _: Engine.ShouldContinue.type => result
       case _: Engine.Unhandled.type      => result
@@ -35,7 +38,7 @@ abstract class AbstractBehavior[T](context: ActorContext[T])
       ctx: TypedActorContext[GCMessage[T]],
       msg: Signal
   ): Behavior[T] = {
-    context.engine.preSignal(msg, context.state, context.typedContext)
+    context.engine.preSignal(msg, context.state, context.typedContext.classicActorContext)
 
     val result =
       onSignal.applyOrElse(
@@ -43,7 +46,7 @@ abstract class AbstractBehavior[T](context: ActorContext[T])
         { case _ => scaladsl.Behaviors.unhandled }: PartialFunction[Signal, Behavior[T]]
       )
 
-    context.engine.postSignal(msg, context.state, context.typedContext) match {
+    context.engine.postSignal(msg, context.state, context.typedContext.classicActorContext) match {
       case _: Engine.Unhandled.type  => result
       case _: Engine.ShouldStop.type => scaladsl.Behaviors.stopped
       case _: Engine.ShouldContinue.type =>
