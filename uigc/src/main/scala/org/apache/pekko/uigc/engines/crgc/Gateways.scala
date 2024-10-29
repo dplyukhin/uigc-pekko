@@ -114,10 +114,6 @@ class Egress(
       .init(recipient = OptionVal.None, message = msg, sender = OptionVal.None)
 }
 
-object Ingress {
-  trait Msg extends Gateway.Msg
-}
-
 class Ingress(system: ExtendedActorSystem, adjacentAddress: Address) extends Gateway {
   override val thisAddress: Address = Cluster(system).selfAddress
   private val gc = UIGC(system).asInstanceOf[CRGC].bookkeeper
@@ -148,7 +144,7 @@ class MultiIngress(
     _ignore: Address
 ) extends GraphStageLogic(shape) {
 
-  private var ingressActors: mutable.Map[Address, Ingress] = mutable.Map()
+  private val ingressActors: mutable.Map[Address, Ingress] = mutable.Map()
 
   setHandler(
     in,

@@ -143,7 +143,7 @@ class MAC(system: ExtendedActorSystem) extends Engine {
       state: State,
       context: actor.ActorContext
   ): WrappedActorRef =
-    state.self.asInstanceOf[WrappedActorRef]
+    state.self
 
   override def spawnImpl(
       factory: SpawnInfo => actor.ActorRef,
@@ -221,9 +221,9 @@ class MAC(system: ExtendedActorSystem) extends Engine {
       ctx: actor.ActorContext
   ): Engine.TerminationDecision =
     signal match {
-      case signal: Terminated =>
+      case _: Terminated =>
         tryTerminate(state, ctx)
-      case signal =>
+      case _ =>
         Engine.Unhandled
     }
 

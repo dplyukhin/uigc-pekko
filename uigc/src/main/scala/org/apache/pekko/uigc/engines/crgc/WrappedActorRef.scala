@@ -13,8 +13,7 @@ class WrappedActorRef(
     // get the GC's version of the shadow. But it's also okay if the parent actor
     // reads a stale value of this field. We can remove @volatile if it worsens
     // performance.
-) extends uigc.ActorRef
-    with Serializable {
+) extends uigc.ActorRef with Serializable {
 
   private var _hasBeenRecorded: Boolean = false
   private var _info: Short = RefobInfo.activeRefob

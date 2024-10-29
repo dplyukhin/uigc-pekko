@@ -91,7 +91,7 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
       state: State,
       context: actor.ActorContext
   ): WrappedActorRef =
-    state.self.asInstanceOf[WrappedActorRef]
+    state.self
 
   override def spawnImpl(
       factory: SpawnInfo => actor.ActorRef,
@@ -135,7 +135,7 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
         val it = ctx.children.iterator
         while (it.hasNext) {
           val child = it.next()
-          child.tell(WaveMsg)
+          child ! WaveMsg
         }
         Engine.ShouldContinue
       case _ =>
