@@ -258,7 +258,7 @@ class MAC(system: ExtendedActorSystem) extends Engine {
       WrappedActorRef(target.target)
     }
 
-  override def releaseImpl(
+  override def deactivateImpl(
       ref: WrappedActorRef,
       state: State,
       ctx: actor.ActorContext

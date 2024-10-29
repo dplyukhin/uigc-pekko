@@ -4,6 +4,7 @@ import org.apache.pekko.actor.typed
 import org.apache.pekko.actor.typed.scaladsl
 import org.apache.pekko.actor.typed.scaladsl.AskPattern.{Askable, schedulerFromActorSystem}
 import org.apache.pekko.uigc.engines.Engine
+import org.apache.pekko.uigc.UIGC
 import org.apache.pekko.uigc.interfaces._
 import org.apache.pekko.uigc.actor.typed.{ActorRef, _}
 import org.apache.pekko.util.Timeout
@@ -96,7 +97,7 @@ class ActorContext[T](
   /** Releases a collection of references from an actor.
     */
   def release(releasing: Iterable[ActorRef[Nothing]]): Unit =
-    engine.release(releasing, state, typedContext)
+    engine.deactivate(releasing, state, typedContext)
 
   /** Releases all of the given references.
     * @param releasing

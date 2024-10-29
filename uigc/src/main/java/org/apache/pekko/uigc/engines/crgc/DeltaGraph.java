@@ -82,7 +82,7 @@ public class DeltaGraph implements Serializable {
         // Created refs.
         for (int i = 0; i < context.EntryFieldSize; i++) {
             if (entry.createdOwners[i] == null) break;
-            WrappedActorRef<?> owner = entry.createdOwners[i];
+            WrappedActorRef owner = entry.createdOwners[i];
             short targetID = encode(entry.createdTargets[i]);
 
             // Increment the number of outgoing refs to the target
@@ -94,7 +94,7 @@ public class DeltaGraph implements Serializable {
         // Spawned actors.
         for (int i = 0; i < context.EntryFieldSize; i++) {
             if (entry.spawnedActors[i] == null) break;
-            WrappedActorRef<?> child = entry.spawnedActors[i];
+            WrappedActorRef child = entry.spawnedActors[i];
 
             // Set the child's supervisor field
             short childID = encode(child);
@@ -107,7 +107,7 @@ public class DeltaGraph implements Serializable {
         for (int i = 0; i < context.EntryFieldSize; i++) {
             if (entry.updatedRefs[i] == null) break;
             short info = entry.updatedInfos[i];
-            WrappedActorRef<?> target = entry.updatedRefs[i];
+            WrappedActorRef target = entry.updatedRefs[i];
             short targetID = encode(target);
             short sendCount = RefobInfo.count(info);
             boolean isActive = RefobInfo.isActive(info);
@@ -138,8 +138,8 @@ public class DeltaGraph implements Serializable {
     /**
      * Returns the compressed ID of a reference, possibly allocating a new {@link DeltaShadow} in the process.
      */
-    private short encode(WrappedActorRef<?> refob) {
-        return encode(refob.target().classicRef());
+    private short encode(WrappedActorRef refob) {
+        return encode(refob.target());
     }
 
     /**

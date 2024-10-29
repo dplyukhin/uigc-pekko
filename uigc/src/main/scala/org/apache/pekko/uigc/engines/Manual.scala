@@ -84,7 +84,7 @@ class Manual extends Engine {
   ): WrappedActorRef =
     WrappedActorRef(target.target)
 
-  override def releaseImpl(
+  override def deactivateImpl(
       releasing: WrappedActorRef,
       state: State,
       ctx: actor.ActorContext

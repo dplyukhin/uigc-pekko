@@ -93,10 +93,10 @@ trait Engine extends Extension {
 
   def createRefImpl(target: ActorRefImpl, owner: ActorRefImpl, state: StateImpl, ctx: actor.ActorContext): ActorRefImpl
 
-  def release(releasing: uigc.ActorRef, state: uigc.State, ctx: actor.ActorContext): Unit =
-    releaseImpl(releasing.asInstanceOf[ActorRefImpl], state.asInstanceOf[StateImpl], ctx)
+  def deactivate(releasing: uigc.ActorRef, state: uigc.State, ctx: actor.ActorContext): Unit =
+    deactivateImpl(releasing.asInstanceOf[ActorRefImpl], state.asInstanceOf[StateImpl], ctx)
 
-  def releaseImpl(releasing: ActorRefImpl, state: StateImpl, ctx: actor.ActorContext): Unit
+  def deactivateImpl(releasing: ActorRefImpl, state: StateImpl, ctx: actor.ActorContext): Unit
 
   def spawnIngress(
       in: Inlet[InboundEnvelope],

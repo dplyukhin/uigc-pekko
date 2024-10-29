@@ -157,7 +157,7 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
     ref
   }
 
-  override def releaseImpl(
+  override def deactivateImpl(
                                   ref: WrappedActorRef,
                                   state: State,
                                   ctx: actor.ActorContext
