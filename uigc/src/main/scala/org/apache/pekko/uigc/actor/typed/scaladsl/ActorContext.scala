@@ -27,7 +27,10 @@ class ActorContext[T](
 
   private[pekko] val state: State = engine.initState(typedContext.classicActorContext, spawnInfo)
 
-  val self: ActorRef[T] = engine.getSelfRef(state, typedContext.classicActorContext)
+  val self: ActorRef[T] = {
+    val ref = engine.getSelfRef(state, typedContext.classicActorContext)
+    new ActorRef[T](ref)
+  }
 
   def system: ActorSystem[Nothing] = ActorSystem(typedContext.system)
 
@@ -42,8 +45,14 @@ class ActorContext[T](
     * @return
     *   An [[ActorRef]] for the spawned actor.
     */
-  def spawn[S](factory: ActorFactory[S], name: String): ActorRef[S] =
-    engine.spawn(info => typedContext.spawn(factory(info), name).classicRef, state, typedContext.classicActorContext)
+  def spawn[S](factory: ActorFactory[S], name: String): ActorRef[S] = {
+    val ref = engine.spawn(
+      info => typedContext.spawn(factory(info), name).classicRef,
+      state,
+      typedContext.classicActorContext
+    )
+    new ActorRef[S](ref)
+  }
 
   def spawnRemote[S](
       factory: String,
@@ -61,7 +70,8 @@ class ActorContext[T](
       Await.result[unmanaged.ActorRef[GCMessage[S]]](f, Duration.Inf)
     }
 
-    engine.spawn(info => spawnIt(info).classicRef, state, typedContext.classicActorContext)
+    val ref = engine.spawn(info => spawnIt(info).classicRef, state, typedContext.classicActorContext)
+    new ActorRef[S](ref)
   }
 
   /** Spawn a new anonymous actor into the GC system.
@@ -73,8 +83,14 @@ class ActorContext[T](
     * @return
     *   An [[ActorRef]] for the spawned actor.
     */
-  def spawnAnonymous[S](factory: ActorFactory[S]): ActorRef[S] =
-    engine.spawn(info => typedContext.spawnAnonymous(factory(info)).classicRef, state, typedContext.classicActorContext)
+  def spawnAnonymous[S](factory: ActorFactory[S]): ActorRef[S] = {
+    val ref = engine.spawn(
+      info => typedContext.spawnAnonymous(factory(info)).classicRef,
+      state,
+      typedContext.classicActorContext
+    )
+    new ActorRef[S](ref)
+  }
 
   /** Creates a reference to an actor to be sent to another actor and adds it to the created
     * collection. e.g. A has x: A->B and y: A->C. A could create z: B->C using y and send it to B
@@ -89,18 +105,9 @@ class ActorContext[T](
     * @return
     *   The created reference.
     */
-  def createRef[S](target: ActorRef[S], owner: ActorRef[Nothing]): ActorRef[S] =
-    engine.createRef(target, owner, state, typedContext.classicActorContext)
-
-  /** Releases a collection of references from an actor.
-    */
-  def release(releasing: Iterable[ActorRef[Nothing]]): Unit =
-    engine.deactivate(releasing, state, typedContext)
-
-  /** Releases all of the given references.
-    * @param releasing
-    *   A list of references.
-    */
-  def release(releasing: ActorRef[Nothing]*): Unit = release(releasing)
+  def createRef[S](target: ActorRef[S], owner: ActorRef[Nothing]): ActorRef[S] = {
+    val ref = engine.createRef(target.ref, owner.ref, state, typedContext.classicActorContext)
+    new ActorRef[S](ref)
+  }
 
 }
