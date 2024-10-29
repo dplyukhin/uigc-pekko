@@ -8,7 +8,7 @@ object Manual {
 
   case class GCMessage[+T](payload: T, refs: Iterable[WrappedActorRef]) extends uigc.GCMessage[T]
 
-  case class WrappedActorRef(target: actor.ActorRef) extends uigc.ActorRef
+  case class WrappedActorRef(target: actor.ActorRef) extends uigc.ActorRef(target)
 
   case object Info extends SpawnInfo
 

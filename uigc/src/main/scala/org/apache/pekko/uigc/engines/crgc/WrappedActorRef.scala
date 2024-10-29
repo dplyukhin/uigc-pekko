@@ -6,14 +6,16 @@ import org.apache.pekko.uigc.{interfaces => uigc}
 import java.io.{IOException, ObjectInputStream, ObjectOutputStream}
 
 class WrappedActorRef(
-    var target: actor.ActorRef,
-    @volatile var targetShadow: Shadow
-    // This field is read by actors that create new refobs and written-to by
-    // the GC. Adding @volatile makes it more likely that the parent actor will
-    // get the GC's version of the shadow. But it's also okay if the parent actor
-    // reads a stale value of this field. We can remove @volatile if it worsens
-    // performance.
-) extends uigc.ActorRef with Serializable {
+     var target: actor.ActorRef,
+     /**
+     * This field is read by actors that create new refobs and written-to by
+     * the GC. Adding @volatile makes it more likely that the parent actor will
+     * get the GC's version of the shadow. But it's also okay if the parent actor
+     * reads a stale value of this field. We can remove @volatile if it worsens
+     * performance.
+     */
+     @volatile private[pekko] var targetShadow: Shadow
+) extends uigc.ActorRef(target) with Serializable {
 
   private var _hasBeenRecorded: Boolean = false
   private var _info: Short = RefobInfo.activeRefob

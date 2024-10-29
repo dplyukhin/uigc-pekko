@@ -3,6 +3,7 @@ package org.apache.pekko.uigc.engines.mac
 import org.apache.pekko.actor
 import org.apache.pekko.actor.ExtendedActorSystem
 import com.typesafe.config.Config
+import org.apache.pekko.actor.typed
 import org.apache.pekko.uigc.engines.Engine
 import org.apache.pekko.uigc.engines.mac.jfr.ActorBlockedEvent
 import org.apache.pekko.uigc.{interfaces => uigc}
@@ -15,7 +16,7 @@ object MAC {
 
   private val RC_INC: Long = 255
 
-  case class WrappedActorRef(target: actor.ActorRef) extends uigc.ActorRef
+  case class WrappedActorRef(target: actor.ActorRef) extends uigc.ActorRef(target)
 
   ////////////////////////////////////////////////////////////////////////////////
   ///////////////////////////////// MESSAGES /////////////////////////////////////
@@ -154,8 +155,7 @@ class MAC(system: ExtendedActorSystem) extends Engine {
     ctx.watch(actorRef)
     val pair = new Pair(numRefs = 1, weight = RC_INC)
     state.actorMap(actorRef) = pair
-    val WrappedActorRef = WrappedActorRef(actorRef)
-    WrappedActorRef
+    WrappedActorRef(actorRef)
   }
 
   private def unblocked(state: State, ctx: actor.ActorContext): Unit = {
@@ -221,7 +221,7 @@ class MAC(system: ExtendedActorSystem) extends Engine {
       ctx: actor.ActorContext
   ): Engine.TerminationDecision =
     signal match {
-      case _: Terminated =>
+      case _: typed.Terminated =>
         tryTerminate(state, ctx)
       case _ =>
         Engine.Unhandled
