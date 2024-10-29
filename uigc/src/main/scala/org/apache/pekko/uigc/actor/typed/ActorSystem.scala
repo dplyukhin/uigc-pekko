@@ -1,11 +1,11 @@
-package actor.typed
+package org.apache.pekko.uigc.actor.typed
 
 import org.apache.pekko.Done
 import org.apache.pekko.actor.typed.{Dispatchers, Extension, ExtensionId, Settings}
 import org.apache.pekko.actor.{Address, DynamicAccess, typed}
 import com.typesafe.config.Config
-import org.apache.pekko.uigc.actor
-import org.apache.pekko.uigc.actor.typed.interfaces.GCMessage
+import org.apache.pekko.uigc.UIGC
+import org.apache.pekko.uigc.interfaces.GCMessage
 import org.slf4j.Logger
 
 import java.util.concurrent.{CompletionStage, ThreadFactory}

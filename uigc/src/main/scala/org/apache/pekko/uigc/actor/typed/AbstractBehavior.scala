@@ -1,11 +1,9 @@
-package actor.typed.actor.typed
+package org.apache.pekko.uigc.actor.typed
 
 import org.apache.pekko.actor.typed.{ExtensibleBehavior, Signal, TypedActorContext, scaladsl}
-import org.apache.pekko.uigc.actor
-import org.apache.pekko.uigc.actor.typed.engines.Engine
-import org.apache.pekko.uigc.actor.typed.interfaces._
-import org.apache.pekko.uigc.actor.typed.Behavior
-import org.apache.pekko.uigc.actor.typed.actor.typed.scaladsl.ActorContext
+import org.apache.pekko.uigc.engines.Engine
+import org.apache.pekko.uigc.interfaces.GCMessage
+import org.apache.pekko.uigc.actor.typed.scaladsl.ActorContext
 
 abstract class AbstractBehavior[T](context: ActorContext[T])
     extends ExtensibleBehavior[GCMessage[T]] {

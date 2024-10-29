@@ -5,8 +5,8 @@ import org.apache.pekko.actor.typed.scaladsl
 import org.apache.pekko.actor.typed.scaladsl.AskPattern.{Askable, schedulerFromActorSystem}
 import org.apache.pekko.uigc.engines.Engine
 import org.apache.pekko.uigc.UIGC
-import org.apache.pekko.uigc.interfaces._
-import org.apache.pekko.uigc.actor.typed.{ActorRef, _}
+import org.apache.pekko.uigc.interfaces.{GCMessage, SpawnInfo, State}
+import org.apache.pekko.uigc.actor.typed._
 import org.apache.pekko.util.Timeout
 
 import scala.concurrent.duration.{Duration, DurationInt}
@@ -23,13 +23,11 @@ class ActorContext[T](
     val spawnInfo: SpawnInfo
 ) {
 
-  private[uigc] val engine: Engine = UIGC(typedContext.system)
+  private[pekko] val engine: Engine = UIGC(typedContext.system)
 
-  private[uigc] val state: State = engine.initState(typedContext.classicActorContext, spawnInfo)
+  private[pekko] val state: State = engine.initState(typedContext.classicActorContext, spawnInfo)
 
   val self: ActorRef[T] = engine.getSelfRef(state, typedContext.classicActorContext)
-
-  def name: ActorName = typedContext.self
 
   def system: ActorSystem[Nothing] = ActorSystem(typedContext.system)
 

@@ -1,4 +1,4 @@
-package actor.typed.actor.typed.scaladsl
+package org.apache.pekko.uigc.actor.typed.scaladsl
 
 import org.apache.pekko.actor.typed
 import org.apache.pekko.actor.typed.BehaviorInterceptor.ReceiveTarget
