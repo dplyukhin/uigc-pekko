@@ -26,7 +26,7 @@ package object typed {
         replyTo: unmanaged.ActorRef[unmanaged.ActorRef[GCMessage[T]]]
     ) extends Command[T]
 
-    def apply[T](
+    def apply[T <: Message](
         factories: Map[String, ActorContext[T] => Behavior[T]]
     ): unmanaged.Behavior[Command[T]] =
       unmanaged.Behaviors.receive { (ctx, msg) =>

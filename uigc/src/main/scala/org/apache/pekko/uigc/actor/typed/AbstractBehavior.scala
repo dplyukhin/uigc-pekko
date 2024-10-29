@@ -5,7 +5,7 @@ import org.apache.pekko.uigc.engines.Engine
 import org.apache.pekko.uigc.interfaces.GCMessage
 import org.apache.pekko.uigc.actor.typed.scaladsl.ActorContext
 
-abstract class AbstractBehavior[T](context: ActorContext[T])
+abstract class AbstractBehavior[T <: Message](context: ActorContext[T])
     extends ExtensibleBehavior[GCMessage[T]] {
 
   implicit val _context: ActorContext[T] = context

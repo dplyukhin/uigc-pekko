@@ -5,8 +5,8 @@ import org.apache.pekko.actor.typed.BehaviorInterceptor.ReceiveTarget
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
 import org.apache.pekko.actor.typed.{BehaviorInterceptor, TypedActorContext, scaladsl}
 import org.apache.pekko.uigc.UIGC
-import org.apache.pekko.uigc.interfaces._
-import org.apache.pekko.uigc.actor.typed.{ActorFactory, Behavior}
+import org.apache.pekko.uigc.interfaces.{GCMessage, SpawnInfo}
+import org.apache.pekko.uigc.actor.typed._
 
 import scala.reflect.ClassTag
 
@@ -15,7 +15,7 @@ object Behaviors {
   /** Sets up a garbage-collected actor. The [[ActorFactory]] instance produced by this method can
     * only be used by *GC-aware* actors.
     */
-  def setup[T](factory: ActorContext[T] => Behavior[T]): ActorFactory[T] =
+  def setup[T <: Message](factory: ActorContext[T] => Behavior[T]): ActorFactory[T] =
     (info: SpawnInfo) =>
       scaladsl.Behaviors.setup(context => factory(new ActorContext(context, info)))
 
@@ -55,5 +55,5 @@ object Behaviors {
   /** Returns a behavior that releases all its references, ignores all messages, and waits to be
     * terminated by the garbage collector.
     */
-  def stopped[T](context: ActorContext[T]): Behavior[T] = scaladsl.Behaviors.stopped
+  def stopped[T <: Message](context: ActorContext[T]): Behavior[T] = scaladsl.Behaviors.stopped
 }

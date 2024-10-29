@@ -2,10 +2,9 @@ package org.apache.pekko.uigc
 
 import org.apache.pekko.actor.testkit.typed.scaladsl.{ScalaTestWithActorTestKit, TestProbe}
 import org.apache.pekko.actor.typed.{PostStop, Signal, Behavior => AkkaBehavior}
-import org.apache.pekko.uigc.actor.typed.AbstractBehavior
-import org.apache.pekko.uigc.actor.typed.scaladsl.{ActorContext, Behaviors}
+import org.apache.pekko.uigc.actor.typed._
+import org.apache.pekko.uigc.actor.typed.scaladsl._
 import org.scalatest.wordspec.AnyWordSpecLike
-import org.apache.pekko.uigc.interfaces.{ActorRef, Message, NoRefs}
 
 
 object SelfMessagingSpec {
@@ -47,7 +46,7 @@ class SelfMessagingSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
       msg match {
         case SelfRefTestInit(n) =>
           actorB ! Countdown(n)
-          context.release(actorB)
+          //context.release(actorB)
           this
         case _ =>
           this

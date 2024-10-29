@@ -5,13 +5,19 @@ import org.apache.pekko.uigc.{interfaces => uigc}
 
 import scala.annotation.unchecked.uncheckedVariance
 
-class ActorRef[-T] private[pekko] (private[pekko] val ref: uigc.ActorRef) {
+class ActorRef[-T <: Message] private[pekko] (private[pekko] val ref: uigc.ActorRef) {
 
   /**
    * Send a message to the Actor referenced by this ActorRef using *at-most-once*
    * messaging semantics.
    */
   def tell(msg: T): Unit = ref ! msg
+
+  /**
+   * Send a message to the Actor referenced by this ActorRef using *at-most-once*
+   * messaging semantics.
+   */
+  def !(msg: T): Unit = ref ! msg
 
   /**
    * Narrow the type of this `ActorRef`, which is always a safe operation.
@@ -24,7 +30,7 @@ class ActorRef[-T] private[pekko] (private[pekko] val ref: uigc.ActorRef) {
    * which would unfortunately also work on non-ActorRefs. Use it with caution,it may cause a [[java.lang.ClassCastException]] when you send a message
    * to the widened actorRef.
    */
-  def unsafeUpcast[U >: T @uncheckedVariance]: ActorRef[U] = this.asInstanceOf[ActorRef[U]]
+  def unsafeUpcast[U >: T @uncheckedVariance <: Message]: ActorRef[U] = this.asInstanceOf[ActorRef[U]]
 
   /**
    * The hierarchical path name of the referenced Actor. The lifecycle of the

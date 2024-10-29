@@ -18,7 +18,7 @@ import scala.concurrent.{Await, Future}
   * garbage-collected actors can safely change their behavior by passing their [[ActorContext]] to
   * the behavior they take on.
   */
-class ActorContext[T](
+class ActorContext[T <: Message](
     val typedContext: scaladsl.ActorContext[GCMessage[T]],
     val spawnInfo: SpawnInfo
 ) {
@@ -45,7 +45,7 @@ class ActorContext[T](
     * @return
     *   An [[ActorRef]] for the spawned actor.
     */
-  def spawn[S](factory: ActorFactory[S], name: String): ActorRef[S] = {
+  def spawn[S <: Message](factory: ActorFactory[S], name: String): ActorRef[S] = {
     val ref = engine.spawn(
       info => typedContext.spawn(factory(info), name).classicRef,
       state,
@@ -54,7 +54,7 @@ class ActorContext[T](
     new ActorRef[S](ref)
   }
 
-  def spawnRemote[S](
+  def spawnRemote[S <: Message](
       factory: String,
       location: unmanaged.ActorRef[RemoteSpawner.Command[S]]
   ): ActorRef[S] = {
@@ -83,7 +83,7 @@ class ActorContext[T](
     * @return
     *   An [[ActorRef]] for the spawned actor.
     */
-  def spawnAnonymous[S](factory: ActorFactory[S]): ActorRef[S] = {
+  def spawnAnonymous[S <: Message](factory: ActorFactory[S]): ActorRef[S] = {
     val ref = engine.spawn(
       info => typedContext.spawnAnonymous(factory(info)).classicRef,
       state,
@@ -105,7 +105,7 @@ class ActorContext[T](
     * @return
     *   The created reference.
     */
-  def createRef[S](target: ActorRef[S], owner: ActorRef[Nothing]): ActorRef[S] = {
+  def createRef[S <: Message](target: ActorRef[S], owner: ActorRef[Nothing]): ActorRef[S] = {
     val ref = engine.createRef(target.ref, owner.ref, state, typedContext.classicActorContext)
     new ActorRef[S](ref)
   }

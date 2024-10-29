@@ -2,12 +2,11 @@ package org.apache.pekko.uigc
 
 import org.apache.pekko.actor.testkit.typed.scaladsl.{ScalaTestWithActorTestKit, TestProbe}
 import org.apache.pekko.actor.typed.{PostStop, Signal, Behavior => AkkaBehavior}
-import org.apache.pekko.uigc.actor.typed.AbstractBehavior
-import org.apache.pekko.uigc.actor.typed.scaladsl.{ActorContext, Behaviors}
+import org.apache.pekko.uigc.actor.typed._
+import org.apache.pekko.uigc.actor.typed.scaladsl._
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.duration._
-import org.apache.pekko.uigc.interfaces.{Message, NoRefs}
 
 
 /** 
@@ -25,8 +24,8 @@ class SupervisionSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
   case object ReleaseParent extends TestMessage with NoRefs
   case class Spawned(name: ActorName) extends TestMessage with NoRefs
   case class Terminated(name: ActorName) extends TestMessage with NoRefs
-  case class GetRef(ref: interfaces.ActorRef[TestMessage]) extends TestMessage with Message {
-    override def refs: Iterable[interfaces.ActorRef[Nothing]] = Iterable(ref)
+  case class GetRef(ref: ActorRef[TestMessage]) extends TestMessage with Message {
+    override def refs: Iterable[ActorRef[Nothing]] = Iterable(ref)
   }
 
 
@@ -74,9 +73,9 @@ class SupervisionSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
   }
 
   class RootActor(context: ActorContext[TestMessage]) extends AbstractBehavior[TestMessage](context) {
-    var actorA: interfaces.ActorRef[TestMessage] = _
-    var actorB: interfaces.ActorRef[TestMessage] = _
-    var actorC: interfaces.ActorRef[TestMessage] = _
+    var actorA: ActorRef[TestMessage] = _
+    var actorB: ActorRef[TestMessage] = _
+    var actorC: ActorRef[TestMessage] = _
     override def onMessage(msg: TestMessage): Behavior[TestMessage] = {
       msg match {
         case Init =>
@@ -107,8 +106,8 @@ class SupervisionSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
   }
   class Parent(context: ActorContext[TestMessage]) extends AbstractBehavior[TestMessage](context) {
     probe.ref ! Spawned(context.name)
-    var actorB: interfaces.ActorRef[TestMessage] = context.spawn(Child(), "child1")
-    var actorC: interfaces.ActorRef[TestMessage] = context.spawn(Child(), "child2")
+    var actorB: ActorRef[TestMessage] = context.spawn(Child(), "child1")
+    var actorC: ActorRef[TestMessage] = context.spawn(Child(), "child2")
     probe.ref ! Spawned(actorB.typedActorRef)
     probe.ref ! Spawned(actorC.typedActorRef)
     override def onMessage(msg: TestMessage): Behavior[TestMessage] = {

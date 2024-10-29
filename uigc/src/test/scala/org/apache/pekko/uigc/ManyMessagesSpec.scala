@@ -2,9 +2,8 @@ package org.apache.pekko.uigc
 
 import org.apache.pekko.actor.testkit.typed.scaladsl.{ScalaTestWithActorTestKit, TestProbe}
 import org.apache.pekko.actor.typed.{PostStop, Signal, Behavior => AkkaBehavior}
-import org.apache.pekko.uigc.actor.typed.{AbstractBehavior, ActorRef}
-import org.apache.pekko.uigc.actor.typed.scaladsl.{ActorContext, Behaviors}
-import org.apache.pekko.uigc.interfaces.{Message, NoRefs}
+import org.apache.pekko.uigc.actor.typed._
+import org.apache.pekko.uigc.actor.typed.scaladsl._
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import scala.concurrent.duration.{Duration, DurationInt}

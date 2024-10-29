@@ -3,9 +3,8 @@ package org.apache.pekko.uigc
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.{PostStop, Signal}
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
-import org.apache.pekko.uigc.actor.typed.AbstractBehavior
-import org.apache.pekko.uigc.actor.typed.scaladsl.{ActorContext, Behaviors}
-import org.apache.pekko.uigc.interfaces.Message
+import org.apache.pekko.uigc.actor.typed._
+import org.apache.pekko.uigc.actor.typed.scaladsl._
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import java.util.concurrent.{CountDownLatch, TimeUnit}
@@ -21,8 +20,8 @@ object RandomSpec {
 
   sealed trait Msg extends Message
 
-  final case class Link(ref: interfaces.ActorRef[Msg]) extends Msg {
-    def refs: Seq[interfaces.ActorRef[Msg]] = Seq(ref)
+  final case class Link(ref: ActorRef[Msg]) extends Msg {
+    def refs: Seq[ActorRef[Msg]] = Seq(ref)
   }
 
   final case class Ping() extends Msg {
@@ -42,7 +41,7 @@ class RandomSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
       timers: TimerScheduler[Msg]
   ) extends AbstractBehavior[Msg](context) {
 
-    private var acquaintances: Set[interfaces.ActorRef[Msg]] = Set()
+    private var acquaintances: Set[ActorRef[Msg]] = Set()
 
     override def onMessage(msg: Msg): Behavior[Msg] =
       msg match {
@@ -62,7 +61,7 @@ class RandomSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
           // Root actor stops the timer and releases all acquaintances, allowing them to become garbage
           // once they stop receiving messages.
           println(s"Spawned $MAX_ACTORS actors. Releasing all acquaintances...")
-          context.release(acquaintances)
+          //context.release(acquaintances)
           acquaintances = Set()
           timers.cancelAll()
         }
@@ -86,7 +85,7 @@ class RandomSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
       } else if (p < 0.6 && acquaintances.nonEmpty) {
         val actor = randomItem(acquaintances)
         acquaintances = acquaintances - actor
-        context.release(actor)
+        //context.release(actor)
       } else if (p < 0.8 && acquaintances.nonEmpty) {
         randomItem(acquaintances) ! Ping()
       }
