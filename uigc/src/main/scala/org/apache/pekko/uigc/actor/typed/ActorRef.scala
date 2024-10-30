@@ -2,6 +2,7 @@ package org.apache.pekko.uigc.actor.typed
 
 import org.apache.pekko.actor.ActorPath
 import org.apache.pekko.actor.typed.internal.adapter.ActorRefAdapter
+import org.apache.pekko.uigc.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.uigc.{interfaces => uigc}
 
 import scala.annotation.unchecked.uncheckedVariance
@@ -14,13 +15,14 @@ class ActorRef[-T <: Message] private[pekko] (private[pekko] val ref: uigc.Actor
    * Send a message to the Actor referenced by this ActorRef using *at-most-once*
    * messaging semantics.
    */
-  def tell(msg: T): Unit = ref ! msg
+  def tell(msg: T, ctx: ActorContext[_]): Unit = this.!(msg)(ctx)
 
   /**
    * Send a message to the Actor referenced by this ActorRef using *at-most-once*
    * messaging semantics.
    */
-  def !(msg: T): Unit = ref ! msg
+  def !(msg: T)(implicit ctx: ActorContext[_]): Unit =
+    ref.tell(msg, msg.refs.map(_.ref), ctx.engine, ctx.state, ctx.typedContext.classicActorContext)
 
   /**
    * Narrow the type of this `ActorRef`, which is always a safe operation.
