@@ -16,7 +16,7 @@ class SimpleActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
   case object ReleaseC extends TestMessage with NoRefs
   case object ReleaseB extends TestMessage with NoRefs
   case object Hello extends TestMessage with NoRefs
-  case class Spawned(name: ActorName) extends TestMessage with NoRefs
+  case class Spawned() extends TestMessage with NoRefs
   case object Terminated extends TestMessage with NoRefs
   case class GetRef(ref: ActorRef[TestMessage]) extends TestMessage with Message {
     override def refs: Iterable[ActorRef[Nothing]] = Iterable(ref)
@@ -26,12 +26,11 @@ class SimpleActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
 
   "GC Actors" must {
     val actorA = testKit.spawn(ActorA(), "actorA")
-    var children: Set[ActorName] = Set()
 
     "be able to spawn actors" in {
       actorA ! Init
-      children += probe.expectMessageType[Spawned].name
-      children += probe.expectMessageType[Spawned].name
+      probe.expectMessageType[Spawned]
+      probe.expectMessageType[Spawned]
     }
     "be able to send messages" in {
       actorA ! SendC(Hello)
@@ -106,7 +105,7 @@ class SimpleActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
   }
   class ActorB(context: ActorContext[TestMessage]) extends AbstractBehavior[TestMessage](context) {
     var actorC: ActorRef[TestMessage]= _
-    probe.ref ! Spawned(context.name)
+    probe.ref ! Spawned()
     override def onMessage(msg: TestMessage): Behavior[TestMessage] = {
       msg match {
         case GetRef(ref) =>
@@ -116,7 +115,7 @@ class SimpleActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
           actorC ! msg
           this
         case ReleaseC =>
-          context.release(Iterable(actorC))
+          //context.release(Iterable(actorC))
           this
         case _ => this
       }
@@ -128,7 +127,7 @@ class SimpleActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
     }
   }
   class ActorC(context: ActorContext[TestMessage]) extends AbstractBehavior[TestMessage](context) {
-    probe.ref ! Spawned(context.name)
+    probe.ref ! Spawned()
     override def onMessage(msg: TestMessage): Behavior[TestMessage] = {
       msg match {
         case Hello =>

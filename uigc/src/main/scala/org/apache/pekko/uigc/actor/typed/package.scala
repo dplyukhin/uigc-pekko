@@ -17,6 +17,7 @@ package object typed {
 
   type Behavior[T] = unmanaged.Behavior[GCMessage[T]]
   type ActorFactory[T] = SpawnInfo => Behavior[T]
+  type ActorName = unmanaged.ActorRef[Nothing]
 
   object RemoteSpawner {
     trait Command[T] extends Serializable

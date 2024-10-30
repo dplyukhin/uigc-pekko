@@ -26,8 +26,10 @@ object Behaviors {
         ctx: TypedActorContext[T],
         msg: T,
         target: ReceiveTarget[GCMessage[T]]
-    ): Behavior[T] =
-      target.apply(ctx, UIGC(ctx.asScala.system).rootMessage(msg, msg.refs))
+    ): Behavior[T] = {
+      val rootMsg = UIGC(ctx.asScala.system).rootMessage(msg, msg.refs.map(_.ref))
+      target.apply(ctx, rootMsg)
+    }
   }
 
   /** Sets up a root actor. Root actors are GC-aware actors that act as "entry points" to a

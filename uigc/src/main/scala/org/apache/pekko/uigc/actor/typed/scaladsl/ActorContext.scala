@@ -32,6 +32,8 @@ class ActorContext[T <: Message](
     new ActorRef[T](ref)
   }
 
+  val name: ActorName = typedContext.self
+
   def system: ActorSystem[Nothing] = ActorSystem(typedContext.system)
 
   /** Spawn a new named actor into the GC system.

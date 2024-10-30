@@ -81,8 +81,8 @@ class SerializationSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
     "serialize and deserialize correctly - two-actor graph" in {
       val ref1: TestProbe[GCMessage[Nothing]] = testKit.createTestProbe()
       val ref2: TestProbe[GCMessage[Nothing]] = testKit.createTestProbe()
-      val refob1: WrappedActorRef = new WrappedActorRef(ref1.ref, null)
-      val refob2: WrappedActorRef = new WrappedActorRef(ref2.ref, null)
+      val refob1: WrappedActorRef = new WrappedActorRef(ref1.ref.classicRef, null)
+      val refob2: WrappedActorRef = new WrappedActorRef(ref2.ref.classicRef, null)
       val state1 = new State(refob1, crgcContext)
 
       state1.recordNewActor(refob2)
@@ -112,8 +112,8 @@ class SerializationSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
     "serialize and deserialize correctly - non-empty entries" in {
       val ref1: TestProbe[GCMessage[Nothing]] = testKit.createTestProbe()
       val ref2: TestProbe[GCMessage[Nothing]] = testKit.createTestProbe()
-      val refob1: WrappedActorRef = new WrappedActorRef(ref1.ref, null)
-      val refob2: WrappedActorRef = new WrappedActorRef(ref2.ref, null)
+      val refob1: WrappedActorRef = new WrappedActorRef(ref1.ref.classicRef, null)
+      val refob2: WrappedActorRef = new WrappedActorRef(ref2.ref.classicRef, null)
 
       val entry = new IngressEntry()
       entry.egressAddress = system.address

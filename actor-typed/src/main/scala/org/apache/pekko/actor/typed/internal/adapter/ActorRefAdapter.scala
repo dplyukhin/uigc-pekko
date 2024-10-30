@@ -25,7 +25,7 @@ import pekko.dispatch.sysmsg
 /**
  * INTERNAL API
  */
-@InternalApi private[typed] class ActorRefAdapter[-T](override val classicRef: classic.InternalActorRef)
+@InternalApi private[pekko] class ActorRefAdapter[-T](override val classicRef: classic.InternalActorRef)
     extends ActorRef[T]
     with internal.ActorRefImpl[T]
     with internal.InternalRecipientRef[T] {

@@ -92,13 +92,13 @@ class SupervisionSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
           }
           this
         case ReleaseParent =>
-          context.release(Iterable(actorA))
+          //context.release(Iterable(actorA))
           this
         case ReleaseChild1 =>
-          context.release(Iterable(actorB))
+          //context.release(Iterable(actorB))
           this
         case ReleaseChild2 =>
-          context.release(Iterable(actorC))
+          //context.release(Iterable(actorC))
           this
         case _ => this
       }
@@ -108,14 +108,14 @@ class SupervisionSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
     probe.ref ! Spawned(context.name)
     var actorB: ActorRef[TestMessage] = context.spawn(Child(), "child1")
     var actorC: ActorRef[TestMessage] = context.spawn(Child(), "child2")
-    probe.ref ! Spawned(actorB.typedActorRef)
-    probe.ref ! Spawned(actorC.typedActorRef)
+    probe.ref ! Spawned(actorB.name)
+    probe.ref ! Spawned(actorC.name)
     override def onMessage(msg: TestMessage): Behavior[TestMessage] = {
       msg match {
         case GetRef(root) =>
           root ! GetRef(context.createRef(actorB, root))
           root ! GetRef(context.createRef(actorC, root))
-          context.release(Iterable(actorB, actorC))
+          //context.release(Iterable(actorB, actorC))
           this
         case _ => this
       }

@@ -1,11 +1,14 @@
 package org.apache.pekko.uigc.actor.typed
 
 import org.apache.pekko.actor.ActorPath
+import org.apache.pekko.actor.typed.internal.adapter.ActorRefAdapter
 import org.apache.pekko.uigc.{interfaces => uigc}
 
 import scala.annotation.unchecked.uncheckedVariance
 
 class ActorRef[-T <: Message] private[pekko] (private[pekko] val ref: uigc.ActorRef) {
+
+  def name: ActorName = ActorRefAdapter(ref.ref)
 
   /**
    * Send a message to the Actor referenced by this ActorRef using *at-most-once*
