@@ -2,6 +2,8 @@ package org.apache.pekko.uigc.engines.crgc;
 
 import org.apache.pekko.uigc.engines.crgc.jfr.EntryFlushEvent;
 
+import java.lang.ref.ReferenceQueue;
+
 public class State implements org.apache.pekko.uigc.interfaces.State {
 
     /** This actor's ref to itself */
@@ -27,6 +29,12 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
     boolean stopRequested;
     Context context;
 
+    // Phantom reference stuff
+    /** The JVM GC populates this queue with phantom references to the refobs that have been deactivated */
+    ReferenceQueue<WrappedActorRef> phantomQueue;
+    /** The set of all phantom references this actor has created and have not yet been deactivated */
+    PhantomBuffer phantomBuffer;
+
     public State(WrappedActorRef self, Context context) {
         this.self = self;
         this.context = context;
@@ -40,6 +48,8 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
         this.recvCount = (short) 0;
         this.isRoot = false;
         this.stopRequested = false;
+        this.phantomQueue = new ReferenceQueue<>();
+        this.phantomBuffer = new PhantomBuffer();
     }
 
     public void markAsRoot() {
@@ -85,6 +95,14 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
     public void recordMessageReceived() {
         assert(canRecordMessageReceived());
         recvCount++;
+    }
+
+    public PhantomBuffer getPhantomBuffer() {
+        return phantomBuffer;
+    }
+
+    public ReferenceQueue<WrappedActorRef> getPhantomQueue() {
+        return phantomQueue;
     }
 
     public void flushToEntry(boolean isBusy, Entry entry) {
