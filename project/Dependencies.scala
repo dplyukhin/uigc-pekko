@@ -236,7 +236,8 @@ object Dependencies {
   val testkit = l ++= Seq(TestDependencies.junit, TestDependencies.scalatest) ++ TestDependencies.metricsAll
 
   val uigcTests = l ++= Seq(
-    TestDependencies.scalacheck
+    TestDependencies.scalacheck,
+    Compile.logback
   )
 
   // TestDependencies.dockerClient brings in older versions of jackson libs that have CVEs
