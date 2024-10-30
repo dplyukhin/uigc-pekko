@@ -27,7 +27,7 @@ object Behaviors {
         msg: T,
         target: ReceiveTarget[GCMessage[T]]
     ): Behavior[T] = {
-      val rootMsg = UIGC(ctx.asScala.system).rootMessage(msg, msg.refs.map(_.ref))
+      val rootMsg = UIGC(ctx.asScala.system).rootMessage(msg, msg.refs.map(_.refInfo))
       target.apply(ctx, rootMsg)
     }
   }

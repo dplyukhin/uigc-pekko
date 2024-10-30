@@ -5,7 +5,7 @@ import org.apache.pekko.uigc.{interfaces => uigc}
 
 import java.io.{IOException, ObjectInputStream, ObjectOutputStream}
 
-class WrappedActorRef(
+class RefInfo(
      var target: actor.ActorRef,
      /**
      * This field is read by actors that create new refobs and written-to by
@@ -15,7 +15,7 @@ class WrappedActorRef(
      * performance.
      */
      @volatile private[pekko] var targetShadow: Shadow
-) extends uigc.ActorRef(target) with Serializable {
+) extends uigc.RefInfo(target) with Serializable {
 
   private var _hasBeenRecorded: Boolean = false
   private var _info: Short = RefobInfo.activeRefob
@@ -47,7 +47,7 @@ class WrappedActorRef(
 
   override def equals(that: Any): Boolean =
     that match {
-      case that: WrappedActorRef => this.target == that.target
+      case that: RefInfo => this.target == that.target
       case _              => false
     }
 

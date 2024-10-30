@@ -16,7 +16,7 @@ object MAC {
 
   private val RC_INC: Long = 255
 
-  case class WrappedActorRef(target: actor.ActorRef) extends uigc.ActorRef(target)
+  case class RefInfo(target: actor.ActorRef) extends uigc.RefInfo(target)
 
   ////////////////////////////////////////////////////////////////////////////////
   ///////////////////////////////// MESSAGES /////////////////////////////////////
@@ -24,15 +24,15 @@ object MAC {
 
   trait GCMessage[+T] extends uigc.GCMessage[T]
 
-  case class AppMsg[T](payload: T, refs: Iterable[WrappedActorRef], isSelfMsg: Boolean)
+  case class AppMsg[T](payload: T, refs: Iterable[RefInfo], isSelfMsg: Boolean)
       extends GCMessage[T]
 
   private case class DecMsg(weight: Long) extends GCMessage[Nothing] {
-    override def refs: Iterable[WrappedActorRef] = Nil
+    override def refs: Iterable[RefInfo] = Nil
   }
 
   private case object IncMsg extends GCMessage[Nothing] {
-    override def refs: Iterable[WrappedActorRef] = Nil
+    override def refs: Iterable[RefInfo] = Nil
   }
 
   /**
@@ -41,14 +41,14 @@ object MAC {
    * @param token a unique identifier for the cycle perceived by the cycle detector
    */
   case class CNF(token: Int) extends GCMessage[Nothing] {
-    override def refs: Iterable[WrappedActorRef] = Nil
+    override def refs: Iterable[RefInfo] = Nil
   }
 
   ////////////////////////////////////////////////////////////////////////////////
   /////////////////////////////////// STATE //////////////////////////////////////
   ////////////////////////////////////////////////////////////////////////////////
 
-  class State(val self: WrappedActorRef, val kind: SpawnInfo) extends uigc.State {
+  class State(val self: RefInfo, val kind: SpawnInfo) extends uigc.State {
     val actorMap: mutable.HashMap[Name, Pair] = mutable.HashMap()
     var rc: Long = RC_INC
     var pendingSelfMessages: Long = 0
@@ -74,7 +74,7 @@ class MAC(system: ExtendedActorSystem) extends Engine {
   import MAC._
 
   override type GCMessageImpl[+T] = MAC.GCMessage[T]
-  override type ActorRefImpl = MAC.WrappedActorRef
+  override type ActorRefImpl = MAC.RefInfo
   override type SpawnInfoImpl = MAC.SpawnInfo
   override type StateImpl = MAC.State
 
@@ -98,7 +98,7 @@ class MAC(system: ExtendedActorSystem) extends Engine {
   /** Transform a message from a non-GC actor so that it can be understood by a GC actor.
     * Necessarily, the recipient is a root actor.
     */
-  override def rootMessageImpl[T](payload: T, refs: Iterable[WrappedActorRef]): GCMessage[T] =
+  override def rootMessageImpl[T](payload: T, refs: Iterable[RefInfo]): GCMessage[T] =
     AppMsg(payload, refs, isSelfMsg = false)
 
   /** Produces SpawnInfo indicating to the actor that it is a root actor.
@@ -109,7 +109,7 @@ class MAC(system: ExtendedActorSystem) extends Engine {
       context: actor.ActorContext,
       spawnInfo: SpawnInfo
   ): State = {
-    val state = new State(WrappedActorRef(context.self), spawnInfo)
+    val state = new State(RefInfo(context.self), spawnInfo)
     val pair = new Pair(numRefs = 1, weight = RC_INC)
     state.actorMap(context.self) = pair
 
@@ -140,22 +140,22 @@ class MAC(system: ExtendedActorSystem) extends Engine {
     state
   }
 
-  override def getSelfRefImpl(
+  override def getSelfRefInfoImpl(
       state: State,
       context: actor.ActorContext
-  ): WrappedActorRef =
+  ): RefInfo =
     state.self
 
   override def spawnImpl(
       factory: SpawnInfo => actor.ActorRef,
       state: State,
       ctx: actor.ActorContext
-  ): WrappedActorRef = {
+  ): RefInfo = {
     val actorRef = factory(NonRoot)
     ctx.watch(actorRef)
     val pair = new Pair(numRefs = 1, weight = RC_INC)
     state.actorMap(actorRef) = pair
-    WrappedActorRef(actorRef)
+    RefInfo(actorRef)
   }
 
   private def unblocked(state: State, ctx: actor.ActorContext): Unit = {
@@ -239,14 +239,14 @@ class MAC(system: ExtendedActorSystem) extends Engine {
       Engine.ShouldContinue
 
   override def createRefImpl(
-      target: WrappedActorRef,
-      owner: WrappedActorRef,
-      state: State,
-      ctx: actor.ActorContext
-  ): WrappedActorRef =
+                              target: RefInfo,
+                              owner: RefInfo,
+                              state: State,
+                              ctx: actor.ActorContext
+  ): RefInfo =
     if (target.target == ctx.self) {
       state.rc += 1
-      WrappedActorRef(target.target)
+      RefInfo(target.target)
     } else {
       val pair = state.actorMap(target.target)
       if (pair.weight <= 1) {
@@ -255,13 +255,13 @@ class MAC(system: ExtendedActorSystem) extends Engine {
       } else {
         pair.weight -= 1
       }
-      WrappedActorRef(target.target)
+      RefInfo(target.target)
     }
 
   override def deactivateImpl(
-      ref: WrappedActorRef,
-      state: State,
-      ctx: actor.ActorContext
+                               ref: RefInfo,
+                               state: State,
+                               ctx: actor.ActorContext
   ): Unit = {
     if (ref.target == ctx.self) {
       state.rc -= 1
@@ -277,11 +277,11 @@ class MAC(system: ExtendedActorSystem) extends Engine {
   }
 
   override def sendMessageImpl(
-      ref: WrappedActorRef,
-      msg: Any,
-      refs: Iterable[WrappedActorRef],
-      state: State,
-      ctx: actor.ActorContext
+                                ref: RefInfo,
+                                msg: Any,
+                                refs: Iterable[RefInfo],
+                                state: State,
+                                ctx: actor.ActorContext
   ): Unit = {
     val isSelfMsg = ref.target == state.self.target
     if (isSelfMsg) {

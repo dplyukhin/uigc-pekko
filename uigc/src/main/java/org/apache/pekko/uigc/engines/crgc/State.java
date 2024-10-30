@@ -2,19 +2,17 @@ package org.apache.pekko.uigc.engines.crgc;
 
 import org.apache.pekko.uigc.engines.crgc.jfr.EntryFlushEvent;
 
-import java.lang.ref.ReferenceQueue;
-
 public class State implements org.apache.pekko.uigc.interfaces.State {
 
     /** This actor's ref to itself */
-    WrappedActorRef self;
+    RefInfo self;
     /** Tracks references created by this actor */
-    WrappedActorRef[] createdOwners;
-    WrappedActorRef[] createdTargets;
+    RefInfo[] createdOwners;
+    RefInfo[] createdTargets;
     /** Tracks actors spawned by this actor */
-    WrappedActorRef[] spawnedActors;
+    RefInfo[] spawnedActors;
     /** Tracks all the refobs that have been updated in this entry period */
-    WrappedActorRef[] updatedRefobs;
+    RefInfo[] updatedRefobs;
     /** Where in the array to insert the next "created" ref */
     int createdIdx;
     /** Where in the array to insert the next "spawned" ref */
@@ -29,27 +27,19 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
     boolean stopRequested;
     Context context;
 
-    // Phantom reference stuff
-    /** The JVM GC populates this queue with phantom references to the refobs that have been deactivated */
-    ReferenceQueue<WrappedActorRef> phantomQueue;
-    /** The set of all phantom references this actor has created and have not yet been deactivated */
-    PhantomBuffer phantomBuffer;
-
-    public State(WrappedActorRef self, Context context) {
+    public State(RefInfo self, Context context) {
         this.self = self;
         this.context = context;
-        this.createdOwners = new WrappedActorRef[context.EntryFieldSize];
-        this.createdTargets = new WrappedActorRef[context.EntryFieldSize];
-        this.spawnedActors = new WrappedActorRef[context.EntryFieldSize];
-        this.updatedRefobs = new WrappedActorRef[context.EntryFieldSize];
+        this.createdOwners = new RefInfo[context.EntryFieldSize];
+        this.createdTargets = new RefInfo[context.EntryFieldSize];
+        this.spawnedActors = new RefInfo[context.EntryFieldSize];
+        this.updatedRefobs = new RefInfo[context.EntryFieldSize];
         this.createdIdx = 0;
         this.spawnedIdx = 0;
         this.updatedIdx = 0;
         this.recvCount = (short) 0;
         this.isRoot = false;
         this.stopRequested = false;
-        this.phantomQueue = new ReferenceQueue<>();
-        this.phantomBuffer = new PhantomBuffer();
     }
 
     public void markAsRoot() {
@@ -60,7 +50,7 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
         return createdIdx < context.EntryFieldSize;
     }
 
-    public void recordNewRefob(WrappedActorRef owner, WrappedActorRef target) {
+    public void recordNewRefob(RefInfo owner, RefInfo target) {
         assert(canRecordNewRefob());
         int i = createdIdx++;
         createdOwners[i] = owner;
@@ -71,16 +61,16 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
         return spawnedIdx < context.EntryFieldSize;
     }
 
-    public void recordNewActor(WrappedActorRef child) {
+    public void recordNewActor(RefInfo child) {
         assert(canRecordNewActor());
         spawnedActors[spawnedIdx++] = child;
     }
 
-    public boolean canRecordUpdatedRefob(WrappedActorRef refob) {
+    public boolean canRecordUpdatedRefob(RefInfo refob) {
         return refob.hasBeenRecorded() || updatedIdx < context.EntryFieldSize;
     }
 
-    public void recordUpdatedRefob(WrappedActorRef refob) {
+    public void recordUpdatedRefob(RefInfo refob) {
         assert(canRecordUpdatedRefob(refob));
         if (refob.hasBeenRecorded())
             return;
@@ -95,14 +85,6 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
     public void recordMessageReceived() {
         assert(canRecordMessageReceived());
         recvCount++;
-    }
-
-    public PhantomBuffer getPhantomBuffer() {
-        return phantomBuffer;
-    }
-
-    public ReferenceQueue<WrappedActorRef> getPhantomQueue() {
-        return phantomQueue;
     }
 
     public void flushToEntry(boolean isBusy, Entry entry) {

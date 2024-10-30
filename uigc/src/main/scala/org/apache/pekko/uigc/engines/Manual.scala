@@ -8,7 +8,7 @@ object Manual {
 
   case class GCMessage[+T](payload: T, refs: Iterable[WrappedActorRef]) extends uigc.GCMessage[T]
 
-  case class WrappedActorRef(target: actor.ActorRef) extends uigc.ActorRef(target)
+  case class WrappedActorRef(target: actor.ActorRef) extends uigc.RefInfo(target)
 
   case object Info extends SpawnInfo
 
@@ -36,7 +36,7 @@ class Manual extends Engine {
   override def initStateImpl(context: actor.ActorContext, spawnInfo: SpawnInfo): State =
     new State(WrappedActorRef(context.self))
 
-  override def getSelfRefImpl(
+  override def getSelfRefInfoImpl(
       state: State,
       context: actor.ActorContext
   ): WrappedActorRef =

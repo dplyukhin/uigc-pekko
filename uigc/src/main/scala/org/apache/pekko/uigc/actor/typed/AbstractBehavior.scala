@@ -5,10 +5,14 @@ import org.apache.pekko.uigc.engines.Engine
 import org.apache.pekko.uigc.interfaces.GCMessage
 import org.apache.pekko.uigc.actor.typed.scaladsl.ActorContext
 
+import java.lang.ref.ReferenceQueue
+
 abstract class AbstractBehavior[T <: Message](context: ActorContext[T])
     extends ExtensibleBehavior[GCMessage[T]] {
 
   implicit val _context: ActorContext[T] = context
+  private val phantomBuffer: PhantomBuffer = new PhantomBuffer()
+  private val phantomQueue: ReferenceQueue[ActorRef[_]] = new ReferenceQueue()
 
   // User API
   def onMessage(msg: T): Behavior[T]
@@ -18,11 +22,34 @@ abstract class AbstractBehavior[T <: Message](context: ActorContext[T])
       ctx: TypedActorContext[GCMessage[T]],
       msg: GCMessage[T]
   ): Behavior[T] = {
+    // Deactivate all references in the phantom queue and then clear them from the buffer.
+    var anyDeactivated = false
+    var x = phantomQueue.poll()
+    while (x != null) {
+      anyDeactivated = true
+      val phantom = x.asInstanceOf[PhantomActorRef]
+      phantom.deactivate()
+      println(s"Actor ${context.self.ref} deactivating reference to ${phantom.refInfo.ref}")
+      context.engine.deactivate(phantom.refInfo, context.state, context.typedContext.classicActorContext)
+      x = phantomQueue.poll()
+    }
+    if (anyDeactivated) {
+      phantomBuffer.cull()
+    }
+
     val appMsg = context.engine.preMessage(msg, context.state, context.typedContext.classicActorContext)
 
     val result = appMsg match {
-      case Some(msg) => onMessage(msg)
-      case None      => scaladsl.Behaviors.same[GCMessage[T]]
+      case Some(msg) =>
+        val it = msg.refs.iterator
+        while (it.hasNext) {
+          val ref = it.next()
+          val phantom = new PhantomActorRef(ref, phantomQueue)
+          phantomBuffer.add(phantom)
+        }
+        onMessage(msg)
+      case None =>
+        scaladsl.Behaviors.same[GCMessage[T]]
     }
 
     context.engine.postMessage(msg, context.state, context.typedContext.classicActorContext) match {

@@ -28,8 +28,8 @@ class ActorContext[T <: Message](
   private[pekko] val state: State = engine.initState(typedContext.classicActorContext, spawnInfo)
 
   val self: ActorRef[T] = {
-    val ref = engine.getSelfRef(state, typedContext.classicActorContext)
-    new ActorRef[T](ref)
+    val refInfo = engine.getSelfRefInfo(state, typedContext.classicActorContext)
+    new ActorRef[T](typedContext.self.classicRef, refInfo)
   }
 
   val name: ActorName = typedContext.self
@@ -48,12 +48,12 @@ class ActorContext[T <: Message](
     *   An [[ActorRef]] for the spawned actor.
     */
   def spawn[S <: Message](factory: ActorFactory[S], name: String): ActorRef[S] = {
-    val ref = engine.spawn(
+    val refInfo = engine.spawn(
       info => typedContext.spawn(factory(info), name).classicRef,
       state,
       typedContext.classicActorContext
     )
-    new ActorRef[S](ref)
+    new ActorRef[S](refInfo.ref, refInfo)
   }
 
   def spawnRemote[S <: Message](
@@ -72,8 +72,8 @@ class ActorContext[T <: Message](
       Await.result[unmanaged.ActorRef[GCMessage[S]]](f, Duration.Inf)
     }
 
-    val ref = engine.spawn(info => spawnIt(info).classicRef, state, typedContext.classicActorContext)
-    new ActorRef[S](ref)
+    val refInfo = engine.spawn(info => spawnIt(info).classicRef, state, typedContext.classicActorContext)
+    new ActorRef[S](refInfo.ref, refInfo)
   }
 
   /** Spawn a new anonymous actor into the GC system.
@@ -86,12 +86,12 @@ class ActorContext[T <: Message](
     *   An [[ActorRef]] for the spawned actor.
     */
   def spawnAnonymous[S <: Message](factory: ActorFactory[S]): ActorRef[S] = {
-    val ref = engine.spawn(
+    val refInfo = engine.spawn(
       info => typedContext.spawnAnonymous(factory(info)).classicRef,
       state,
       typedContext.classicActorContext
     )
-    new ActorRef[S](ref)
+    new ActorRef[S](refInfo.ref, refInfo)
   }
 
   /** Creates a reference to an actor to be sent to another actor and adds it to the created
@@ -108,8 +108,8 @@ class ActorContext[T <: Message](
     *   The created reference.
     */
   def createRef[S <: Message](target: ActorRef[S], owner: ActorRef[Nothing]): ActorRef[S] = {
-    val ref = engine.createRef(target.ref, owner.ref, state, typedContext.classicActorContext)
-    new ActorRef[S](ref)
+    val refInfo = engine.createRef(target.refInfo, owner.refInfo, state, typedContext.classicActorContext)
+    new ActorRef[S](target.ref, refInfo)
   }
 
 }

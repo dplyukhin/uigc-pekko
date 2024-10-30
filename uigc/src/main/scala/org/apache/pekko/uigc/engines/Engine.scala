@@ -16,7 +16,7 @@ object Engine {
 
 /** A GC engine is a collection of hooks and datatypes, used by the UIGC API. */
 trait Engine extends Extension {
-  type ActorRefImpl <: uigc.ActorRef
+  type ActorRefImpl <: uigc.RefInfo
   type GCMessageImpl[T] <: uigc.GCMessage[T]
   type SpawnInfoImpl <: uigc.SpawnInfo
   type StateImpl <: uigc.State
@@ -24,7 +24,7 @@ trait Engine extends Extension {
   /** Transform a message from a non-GC actor so that it can be understood by a GC actor.
     * Necessarily, the recipient is a root actor.
     */
-  final def rootMessage[T](payload: T, refs: Iterable[uigc.ActorRef]): uigc.GCMessage[T] =
+  final def rootMessage[T](payload: T, refs: Iterable[uigc.RefInfo]): uigc.GCMessage[T] =
     rootMessageImpl[T](payload, refs.asInstanceOf[Iterable[ActorRefImpl]])
 
   def rootMessageImpl[T](payload: T, refs: Iterable[ActorRefImpl]): GCMessageImpl[T]
@@ -45,19 +45,19 @@ trait Engine extends Extension {
 
   /** Get a refob owned by this actor, pointing to itself.
     */
-  final def getSelfRef(state: uigc.State, context: actor.ActorContext): uigc.ActorRef =
-    getSelfRefImpl(state.asInstanceOf[StateImpl], context)
+  final def getSelfRefInfo(state: uigc.State, context: actor.ActorContext): uigc.RefInfo =
+    getSelfRefInfoImpl(state.asInstanceOf[StateImpl], context)
 
-  def getSelfRefImpl(state: StateImpl, context: actor.ActorContext): ActorRefImpl
+  def getSelfRefInfoImpl(state: StateImpl, context: actor.ActorContext): ActorRefImpl
 
   /** Spawn a managed actor. */
-  final def spawn(factory: uigc.SpawnInfo => actor.ActorRef, state: uigc.State, ctx: actor.ActorContext ): uigc.ActorRef =
+  final def spawn(factory: uigc.SpawnInfo => actor.ActorRef, state: uigc.State, ctx: actor.ActorContext ): uigc.RefInfo =
     spawnImpl(factory, state.asInstanceOf[StateImpl], ctx)
 
   def spawnImpl(factory: SpawnInfoImpl => actor.ActorRef, state: StateImpl, ctx: actor.ActorContext): ActorRefImpl
 
   /** Send a message to a managed actor. */
-  def sendMessage(ref: uigc.ActorRef, msg: Any, refs: Iterable[uigc.ActorRef], state: uigc.State, ctx: actor.ActorContext): Unit =
+  def sendMessage(ref: uigc.RefInfo, msg: Any, refs: Iterable[uigc.RefInfo], state: uigc.State, ctx: actor.ActorContext): Unit =
     sendMessageImpl(
       ref.asInstanceOf[ActorRefImpl],
       msg,
@@ -88,12 +88,12 @@ trait Engine extends Extension {
 
   def postSignalImpl(signal: Any, state: StateImpl, ctx: actor.ActorContext): Engine.TerminationDecision
 
-  def createRef(target: uigc.ActorRef, owner: uigc.ActorRef, state: uigc.State, ctx: actor.ActorContext): uigc.ActorRef =
+  def createRef(target: uigc.RefInfo, owner: uigc.RefInfo, state: uigc.State, ctx: actor.ActorContext): uigc.RefInfo =
     createRefImpl(target.asInstanceOf[ActorRefImpl], owner.asInstanceOf[ActorRefImpl], state.asInstanceOf[StateImpl], ctx)
 
   def createRefImpl(target: ActorRefImpl, owner: ActorRefImpl, state: StateImpl, ctx: actor.ActorContext): ActorRefImpl
 
-  def deactivate(releasing: uigc.ActorRef, state: uigc.State, ctx: actor.ActorContext): Unit =
+  def deactivate(releasing: uigc.RefInfo, state: uigc.State, ctx: actor.ActorContext): Unit =
     deactivateImpl(releasing.asInstanceOf[ActorRefImpl], state.asInstanceOf[StateImpl], ctx)
 
   def deactivateImpl(releasing: ActorRefImpl, state: StateImpl, ctx: actor.ActorContext): Unit

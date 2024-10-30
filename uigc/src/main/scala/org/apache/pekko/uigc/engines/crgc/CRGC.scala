@@ -19,7 +19,7 @@ object CRGC {
   trait CollectionStyle
 
   class SpawnInfo(
-      var creator: Option[WrappedActorRef]
+      var creator: Option[RefInfo]
   ) extends uigc.SpawnInfo with Serializable
 
   case object Wave extends CollectionStyle
@@ -34,7 +34,7 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
   import CRGC._
 
   override type GCMessageImpl[+T] = crgc.GCMessage[T]
-  override type ActorRefImpl = crgc.WrappedActorRef
+  override type ActorRefImpl = crgc.RefInfo
   override type SpawnInfoImpl = SpawnInfo
   override type StateImpl = crgc.State
 
@@ -56,7 +56,7 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
       "Bookkeeper"
     )
 
-  override def rootMessageImpl[T](payload: T, refs: Iterable[WrappedActorRef]): GCMessage[T] =
+  override def rootMessageImpl[T](payload: T, refs: Iterable[RefInfo]): GCMessage[T] =
     AppMsg(payload, refs)
 
   override def rootSpawnInfoImpl(): SpawnInfo =
@@ -67,7 +67,7 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
       spawnInfo: SpawnInfo
   ): State = {
     val self = context.self
-    val selfRefob = new WrappedActorRef(self, targetShadow = null)
+    val selfRefob = new RefInfo(self, targetShadow = null)
     val state = new State(selfRefob, crgcContext)
     state.recordNewRefob(selfRefob, selfRefob)
     spawnInfo.creator match {
@@ -87,19 +87,19 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
     state
   }
 
-  override def getSelfRefImpl(
+  override def getSelfRefInfoImpl(
       state: State,
       context: actor.ActorContext
-  ): WrappedActorRef =
+  ): RefInfo =
     state.self
 
   override def spawnImpl(
       factory: SpawnInfo => actor.ActorRef,
       state: State,
       ctx: actor.ActorContext
-  ): WrappedActorRef = {
+  ): RefInfo = {
     val child = factory(new SpawnInfo(Some(state.self)))
-    val ref = new WrappedActorRef(child, null)
+    val ref = new RefInfo(child, null)
     // NB: "onCreate" is only updated at the child, not the parent.
     if (!state.canRecordNewActor)
       sendEntry(state, isBusy=true)
@@ -145,12 +145,12 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
     }
 
   override def createRefImpl(
-                                    target: WrappedActorRef,
-                                    owner: WrappedActorRef,
-                                    state: State,
-                                    ctx: actor.ActorContext
-  ): WrappedActorRef = {
-    val ref = new WrappedActorRef(target.target, target.targetShadow)
+                              target: RefInfo,
+                              owner: RefInfo,
+                              state: State,
+                              ctx: actor.ActorContext
+  ): RefInfo = {
+    val ref = new RefInfo(target.target, target.targetShadow)
     if (!state.canRecordNewRefob)
       sendEntry(state, isBusy=true)
     state.recordNewRefob(owner, target)
@@ -158,9 +158,9 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
   }
 
   override def deactivateImpl(
-                                  ref: WrappedActorRef,
-                                  state: State,
-                                  ctx: actor.ActorContext
+                               ref: RefInfo,
+                               state: State,
+                               ctx: actor.ActorContext
   ): Unit = {
     if (!state.canRecordUpdatedRefob(ref))
       sendEntry(state, isBusy=true)
@@ -198,11 +198,11 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
     Engine.Unhandled
 
   override def sendMessageImpl(
-                                      ref: WrappedActorRef,
-                                      msg: Any,
-                                      refs: Iterable[WrappedActorRef],
-                                      state: State,
-                                      ctx: actor.ActorContext
+                                ref: RefInfo,
+                                msg: Any,
+                                refs: Iterable[RefInfo],
+                                state: State,
+                                ctx: actor.ActorContext
   ): Unit = {
     if (!ref.canIncSendCount || !state.canRecordUpdatedRefob(ref))
       sendEntry(state, isBusy=true)

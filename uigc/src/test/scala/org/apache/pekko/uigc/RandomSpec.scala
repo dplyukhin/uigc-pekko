@@ -60,10 +60,10 @@ class RandomSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
         if (timers != null) {
           // Root actor stops the timer and releases all acquaintances, allowing them to become garbage
           // once they stop receiving messages.
-          println(s"Spawned $MAX_ACTORS actors. Releasing all acquaintances...")
+          println(s"Spawned $MAX_ACTORS actors. Root actor releasing all acquaintances...")
           //context.release(acquaintances)
           acquaintances = Set()
-          timers.cancelAll()
+          System.gc()
         }
         return
       }
