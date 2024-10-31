@@ -186,6 +186,8 @@ class LocalGC extends Actor with Timers {
       totalEntries += count
 
       shadowGraph.trace(true)
+      if (wakeupCount % 100 == 0)
+        shadowGraph.investigateLiveSet()
       // shadowGraph.assertEquals(testGraph)
 
     case StartWave =>

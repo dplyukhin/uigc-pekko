@@ -6,9 +6,12 @@ import org.apache.pekko.uigc.actor.typed._
 import org.apache.pekko.uigc.actor.typed.scaladsl._
 import org.scalatest.wordspec.AnyWordSpecLike
 
+import scala.concurrent.duration.DurationInt
+
 class SimpleActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
 
   sealed trait TestMessage extends Message
+  case object Ping extends TestMessage with NoRefs
   case object Init extends TestMessage with NoRefs
   case class SendC(msg: TestMessage) extends TestMessage with NoRefs
   case class SendB(msg: TestMessage) extends TestMessage with NoRefs
@@ -50,18 +53,22 @@ class SimpleActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
       probe.expectMessage(Hello)
     }
     "terminate after all references have been released" in {
-      actorA ! SendB(ReleaseC)
-      probe.expectMessage(Terminated)
-    }
-    "terminate after the only reference has been released" in {
       actorA ! ReleaseB
+      probe.expectMessage(Terminated)
       probe.expectMessage(Terminated)
     }
   }
 
   object ActorA {
-    def apply(): unmanaged.Behavior[TestMessage] = 
-      Behaviors.setupRoot(context => new ActorA(context))
+    def apply(): unmanaged.Behavior[TestMessage] =
+      Behaviors.withTimers[TestMessage] { timers =>
+        // Root actor needs to wake up periodically, or else it'll never detect its references
+        // have become garbage.
+        Behaviors.setupRoot { context =>
+          timers.startTimerAtFixedRate((), Ping, 100.millis)
+          new ActorA(context)
+        }
+      }
   }
   object ActorB {
     def apply(): ActorFactory[TestMessage] = {
@@ -94,12 +101,14 @@ class SimpleActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
           actorB ! GetRef(refToShare)
           this
         case ReleaseC =>
-          //context.release(Iterable(actorC))
+          actorC = null
           this
         case ReleaseB =>
-          //context.release(Iterable(actorB))
+          actorB = null
           this
-        case _ => this
+        case _ =>
+          System.gc()
+          this
       }
     }
   }
@@ -115,7 +124,7 @@ class SimpleActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
           actorC ! msg
           this
         case ReleaseC =>
-          //context.release(Iterable(actorC))
+          actorC = null
           this
         case _ => this
       }

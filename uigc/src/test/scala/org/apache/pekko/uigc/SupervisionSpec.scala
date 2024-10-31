@@ -17,6 +17,7 @@ import scala.concurrent.duration._
 class SupervisionSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
 
   sealed trait TestMessage extends Message
+  case object Ping extends TestMessage with NoRefs
   case object Init extends TestMessage with NoRefs
   case object Initialized extends TestMessage with NoRefs
   case object ReleaseChild2 extends TestMessage with NoRefs
@@ -43,6 +44,10 @@ class SupervisionSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
     child2 = probe.expectMessageType[Spawned].name
     probe.expectMessage(Initialized)
 
+    // Leave some time for the parent to discover that its references to
+    // its children are garbage.
+    Thread.sleep(1000)
+
     "not be garbage collected before their children" in {
       root ! ReleaseParent
       probe.expectNoMessage()
@@ -59,8 +64,15 @@ class SupervisionSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
   }
 
   object RootActor {
-    def apply(): AkkaBehavior[TestMessage] = 
-      Behaviors.setupRoot(context => new RootActor(context))
+    def apply(): AkkaBehavior[TestMessage] =
+      Behaviors.withTimers[TestMessage] { timers =>
+        // Root actor needs to wake up periodically, or else it'll never detect its references
+        // have become garbage.
+        Behaviors.setupRoot { context =>
+          timers.startTimerAtFixedRate((), Ping, 100.millis)
+          new RootActor(context)
+        }
+      }
   }
   object Parent {
     def apply(): ActorFactory[TestMessage] = 
@@ -92,15 +104,20 @@ class SupervisionSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
           }
           this
         case ReleaseParent =>
-          //context.release(Iterable(actorA))
+          actorA = null
           this
         case ReleaseChild1 =>
-          //context.release(Iterable(actorB))
+          actorB = null
           this
         case ReleaseChild2 =>
-          //context.release(Iterable(actorC))
+          actorC = null
           this
-        case _ => this
+        case Ping =>
+          if (actorA != null) actorA ! Ping
+          System.gc()
+          this
+        case _ =>
+          this
       }
     }
   }
@@ -115,9 +132,12 @@ class SupervisionSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
         case GetRef(root) =>
           root ! GetRef(context.createRef(actorB, root))
           root ! GetRef(context.createRef(actorC, root))
-          //context.release(Iterable(actorB, actorC))
+          actorB = null
+          actorC = null
           this
-        case _ => this
+        case _ =>
+          System.gc()
+          this
       }
     }
     override def onSignal: PartialFunction[Signal, Behavior[TestMessage]] = {

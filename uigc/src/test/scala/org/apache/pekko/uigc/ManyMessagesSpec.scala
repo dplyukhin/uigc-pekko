@@ -45,16 +45,30 @@ class ManyMessagesSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
 
   object Root {
     def apply(): AkkaBehavior[Msg] =
-      Behaviors.setupRoot(context => new Root(context))
+      Behaviors.withTimers[Msg] { timers =>
+        // Root actor needs to wake up periodically, or else it'll never detect its references
+        // have become garbage.
+        Behaviors.setupRoot { context =>
+          timers.startTimerAtFixedRate((), Ping, 100.millis)
+          new Root(context)
+        }
+      }
   }
   class Root(context: ActorContext[Msg]) extends AbstractBehavior[Msg](context) {
-    val actorA: ActorRef[Msg] = context.spawn(ActorA(), "actorA")
-    val actorB: ActorRef[Msg] = context.spawn(ActorB(), "actorB")
-    actorA ! NewAcquaintance(context.createRef(actorB, actorA))
-    //context.release(actorA, actorB)
+    {
+      // Create a scope so these actors are not fields of the class, so they
+      // should get garbage collected.
+      val actorA: ActorRef[Msg] = context.spawn(ActorA(), "actorA")
+      val actorB: ActorRef[Msg] = context.spawn(ActorB(), "actorB")
+      actorA ! NewAcquaintance(context.createRef(actorB, actorA))
+    }
 
-    override def onMessage(msg: Msg): Behavior[Msg] = {
-      this
+    override def onMessage(msg: Msg): Behavior[Msg] = msg match {
+      case Ping =>
+        // Run the GC manually, since it won't get triggered otherwise!
+        System.gc()
+        this
+      case _ => this
     }
   }
 
