@@ -1,22 +1,12 @@
-package org.apache.pekko
+package org.apache.pekko.uigc.actor
 
-import org.apache.pekko.uigc.interfaces._
+import org.apache.pekko.uigc.interfaces.{GCMessage, SpawnInfo}
+import org.apache.pekko.uigc.actor.typed.scaladsl.{ActorContext, Behaviors}
 
-package object uigc {
+package object typed {
 
-  type ActorRef[-T] = Refob[T]
-
-  type Behavior[T] = unmanaged.Behavior[GCMessage[T]]
-
-  type ActorName = unmanaged.ActorRef[Nothing]
-
-  /** A recipe for spawning a garbage-collected actor. Similar to [[Behavior]], but this recipe can
-    * only be used by *GC-aware* actors,
-    * i.e. a root actor or another garbage-collected actor.
-    */
-  type ActorFactory[T] = SpawnInfo => Behavior[T]
-
-  object unmanaged {
+  /** Convenience object that re-exports the unmanaged typed API. */
+  private[pekko] object unmanaged {
     import org.apache.pekko.actor.typed
     import org.apache.pekko.actor.typed.scaladsl
     type ActorRef[-T] = typed.ActorRef[T]
@@ -24,6 +14,10 @@ package object uigc {
     type ActorContext[T] = scaladsl.ActorContext[T]
     val Behaviors: scaladsl.Behaviors.type = scaladsl.Behaviors
   }
+
+  type Behavior[T] = unmanaged.Behavior[GCMessage[T]]
+  type ActorFactory[T] = SpawnInfo => Behavior[T]
+  type ActorName = unmanaged.ActorRef[Nothing]
 
   object RemoteSpawner {
     trait Command[T] extends Serializable
@@ -33,7 +27,7 @@ package object uigc {
         replyTo: unmanaged.ActorRef[unmanaged.ActorRef[GCMessage[T]]]
     ) extends Command[T]
 
-    def apply[T](
+    def apply[T <: Message](
         factories: Map[String, ActorContext[T] => Behavior[T]]
     ): unmanaged.Behavior[Command[T]] =
       unmanaged.Behaviors.receive { (ctx, msg) =>

@@ -59,12 +59,15 @@ class LocalGC extends Actor with Timers {
   private var remoteGCs: Map[Address, ActorSelection] = Map()
   private var undoLogs: Map[Address, UndoLog] = Map()
   private var downedGCs: Set[Address] = Set()
-  private var undoneGCs: Set[Address] = Set()
+  //private var undoneGCs: Set[Address] = Set()
   private var ingressHooks: Map[Address, () => Unit] = Map()
   private var totalEntries: Int = 0
   // private val testGraph = new ShadowGraph()
   private var deltaGraphID: Int = 0
   private var deltaGraph = DeltaGraph.initialize(thisAddress, engine.crgcContext)
+
+  // Statistics
+  private var wakeupCount = 0
 
   if (numNodes == 1) {
     start()
@@ -74,7 +77,7 @@ class LocalGC extends Actor with Timers {
     println("Waiting for other bookkeepers to join...")
   }
 
-  override def receive = {
+  override def receive: Receive = {
     case MemberUp(member) =>
       addMember(member)
 
@@ -142,6 +145,7 @@ class LocalGC extends Actor with Timers {
     // shadowGraph.assertEquals(testGraph)
 
     case Wakeup =>
+      wakeupCount += 1
       // println("Bookkeeper woke up!")
       val entryProcessingStats = new ProcessingEntries()
       entryProcessingStats.begin()
@@ -182,6 +186,8 @@ class LocalGC extends Actor with Timers {
       totalEntries += count
 
       shadowGraph.trace(true)
+      //if (wakeupCount % 100 == 0)
+      //  shadowGraph.investigateLiveSet()
       // shadowGraph.assertEquals(testGraph)
 
     case StartWave =>

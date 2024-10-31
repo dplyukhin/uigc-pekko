@@ -2,13 +2,17 @@ package org.apache.pekko.uigc
 
 import org.apache.pekko.actor.testkit.typed.scaladsl.{ScalaTestWithActorTestKit, TestProbe}
 import org.apache.pekko.actor.typed.{PostStop, Signal, Behavior => AkkaBehavior}
+import org.apache.pekko.uigc.actor.typed._
+import org.apache.pekko.uigc.actor.typed.scaladsl._
 import org.scalatest.wordspec.AnyWordSpecLike
-import org.apache.pekko.uigc.interfaces.{Message, NoRefs}
+
+import scala.concurrent.duration.DurationInt
 
 
 object SelfMessagingSpec {
   sealed trait SelfRefMsg extends Message
 
+  final case object Ping extends SelfRefMsg with NoRefs
   final case class Countdown(n: Int) extends SelfRefMsg with NoRefs
   final case class SelfRefTestInit(n: Int) extends SelfRefMsg with NoRefs
   final case class SelfRefTerminated(n: Int) extends SelfRefMsg with NoRefs
@@ -35,19 +39,28 @@ class SelfMessagingSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
 
 
   object ActorA {
-    def apply(): AkkaBehavior[SelfRefMsg] = 
-      Behaviors.setupRoot(context => new ActorA(context))
+    def apply(): AkkaBehavior[SelfRefMsg] = {
+      Behaviors.withTimers[SelfRefMsg] { timers =>
+        // Root actor needs to wake up periodically, or else it'll never detect its references
+        // have become garbage.
+        Behaviors.setupRoot { context =>
+          timers.startTimerAtFixedRate((), Ping, 100.millis)
+          new ActorA(context)
+        }
+      }
+    }
   }
   class ActorA(context: ActorContext[SelfRefMsg]) extends AbstractBehavior[SelfRefMsg](context) {
-    val actorB: ActorRef[SelfRefMsg] = context.spawn(ActorB(), "actorB")
 
     override def onMessage(msg: SelfRefMsg): Behavior[SelfRefMsg] = {
       msg match {
         case SelfRefTestInit(n) =>
+          val actorB: ActorRef[SelfRefMsg] = context.spawn(ActorB(), "actorB")
           actorB ! Countdown(n)
-          context.release(actorB)
           this
         case _ =>
+          // Force GC so the JVM detects the reference to actorB is garbage.
+          System.gc()
           this
       }
     }

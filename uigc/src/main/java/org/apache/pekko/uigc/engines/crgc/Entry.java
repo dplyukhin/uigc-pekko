@@ -3,11 +3,11 @@ package org.apache.pekko.uigc.engines.crgc;
 import java.util.Arrays;
 
 public class Entry {
-    public Refob<?> self;
-    public Refob<?>[] createdOwners;
-    public Refob<?>[] createdTargets;
-    public Refob<?>[] spawnedActors;
-    public Refob<?>[] updatedRefs;
+    public RefInfo self;
+    public RefInfo[] createdOwners;
+    public RefInfo[] createdTargets;
+    public RefInfo[] spawnedActors;
+    public RefInfo[] updatedRefs;
     public short[] updatedInfos;
     public short recvCount;
     public boolean isBusy;
@@ -15,10 +15,10 @@ public class Entry {
 
     public Entry(Context context) {
         self           = null;
-        createdOwners  = new Refob<?>[context.EntryFieldSize];
-        createdTargets = new Refob<?>[context.EntryFieldSize];
-        spawnedActors  = new Refob<?>[context.EntryFieldSize];
-        updatedRefs    = new Refob<?>[context.EntryFieldSize];
+        createdOwners  = new RefInfo[context.EntryFieldSize];
+        createdTargets = new RefInfo[context.EntryFieldSize];
+        spawnedActors  = new RefInfo[context.EntryFieldSize];
+        updatedRefs    = new RefInfo[context.EntryFieldSize];
         updatedInfos   = new short[context.EntryFieldSize];
         isBusy         = false;
         isRoot         = false;

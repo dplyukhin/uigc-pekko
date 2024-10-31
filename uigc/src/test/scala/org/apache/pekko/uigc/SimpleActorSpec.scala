@@ -2,12 +2,16 @@ package org.apache.pekko.uigc
 
 import org.apache.pekko.actor.testkit.typed.scaladsl.{ScalaTestWithActorTestKit, TestProbe}
 import org.apache.pekko.actor.typed.{PostStop, Signal}
+import org.apache.pekko.uigc.actor.typed._
+import org.apache.pekko.uigc.actor.typed.scaladsl._
 import org.scalatest.wordspec.AnyWordSpecLike
-import org.apache.pekko.uigc.interfaces.{Message, NoRefs}
+
+import scala.concurrent.duration.DurationInt
 
 class SimpleActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
 
   sealed trait TestMessage extends Message
+  case object Ping extends TestMessage with NoRefs
   case object Init extends TestMessage with NoRefs
   case class SendC(msg: TestMessage) extends TestMessage with NoRefs
   case class SendB(msg: TestMessage) extends TestMessage with NoRefs
@@ -15,7 +19,7 @@ class SimpleActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
   case object ReleaseC extends TestMessage with NoRefs
   case object ReleaseB extends TestMessage with NoRefs
   case object Hello extends TestMessage with NoRefs
-  case class Spawned(name: ActorName) extends TestMessage with NoRefs
+  case class Spawned() extends TestMessage with NoRefs
   case object Terminated extends TestMessage with NoRefs
   case class GetRef(ref: ActorRef[TestMessage]) extends TestMessage with Message {
     override def refs: Iterable[ActorRef[Nothing]] = Iterable(ref)
@@ -25,12 +29,11 @@ class SimpleActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
 
   "GC Actors" must {
     val actorA = testKit.spawn(ActorA(), "actorA")
-    var children: Set[ActorName] = Set()
 
     "be able to spawn actors" in {
       actorA ! Init
-      children += probe.expectMessageType[Spawned].name
-      children += probe.expectMessageType[Spawned].name
+      probe.expectMessageType[Spawned]
+      probe.expectMessageType[Spawned]
     }
     "be able to send messages" in {
       actorA ! SendC(Hello)
@@ -50,18 +53,22 @@ class SimpleActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
       probe.expectMessage(Hello)
     }
     "terminate after all references have been released" in {
-      actorA ! SendB(ReleaseC)
-      probe.expectMessage(Terminated)
-    }
-    "terminate after the only reference has been released" in {
       actorA ! ReleaseB
+      probe.expectMessage(Terminated)
       probe.expectMessage(Terminated)
     }
   }
 
   object ActorA {
-    def apply(): unmanaged.Behavior[TestMessage] = 
-      Behaviors.setupRoot(context => new ActorA(context))
+    def apply(): unmanaged.Behavior[TestMessage] =
+      Behaviors.withTimers[TestMessage] { timers =>
+        // Root actor needs to wake up periodically, or else it'll never detect its references
+        // have become garbage.
+        Behaviors.setupRoot { context =>
+          timers.startTimerAtFixedRate((), Ping, 100.millis)
+          new ActorA(context)
+        }
+      }
   }
   object ActorB {
     def apply(): ActorFactory[TestMessage] = {
@@ -94,18 +101,20 @@ class SimpleActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
           actorB ! GetRef(refToShare)
           this
         case ReleaseC =>
-          context.release(Iterable(actorC))
+          actorC = null
           this
         case ReleaseB =>
-          context.release(Iterable(actorB))
+          actorB = null
           this
-        case _ => this
+        case _ =>
+          System.gc()
+          this
       }
     }
   }
   class ActorB(context: ActorContext[TestMessage]) extends AbstractBehavior[TestMessage](context) {
     var actorC: ActorRef[TestMessage]= _
-    probe.ref ! Spawned(context.name)
+    probe.ref ! Spawned()
     override def onMessage(msg: TestMessage): Behavior[TestMessage] = {
       msg match {
         case GetRef(ref) =>
@@ -115,7 +124,7 @@ class SimpleActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
           actorC ! msg
           this
         case ReleaseC =>
-          context.release(Iterable(actorC))
+          actorC = null
           this
         case _ => this
       }
@@ -127,7 +136,7 @@ class SimpleActorSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
     }
   }
   class ActorC(context: ActorContext[TestMessage]) extends AbstractBehavior[TestMessage](context) {
-    probe.ref ! Spawned(context.name)
+    probe.ref ! Spawned()
     override def onMessage(msg: TestMessage): Behavior[TestMessage] = {
       msg match {
         case Hello =>

@@ -5,14 +5,14 @@ import org.apache.pekko.uigc.engines.crgc.jfr.EntryFlushEvent;
 public class State implements org.apache.pekko.uigc.interfaces.State {
 
     /** This actor's ref to itself */
-    Refob<?> self;
+    RefInfo self;
     /** Tracks references created by this actor */
-    Refob<?>[] createdOwners;
-    Refob<?>[] createdTargets;
+    RefInfo[] createdOwners;
+    RefInfo[] createdTargets;
     /** Tracks actors spawned by this actor */
-    Refob<?>[] spawnedActors;
+    RefInfo[] spawnedActors;
     /** Tracks all the refobs that have been updated in this entry period */
-    Refob<?>[] updatedRefobs;
+    RefInfo[] updatedRefobs;
     /** Where in the array to insert the next "created" ref */
     int createdIdx;
     /** Where in the array to insert the next "spawned" ref */
@@ -27,13 +27,13 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
     boolean stopRequested;
     Context context;
 
-    public State(Refob<?> self, Context context) {
+    public State(RefInfo self, Context context) {
         this.self = self;
         this.context = context;
-        this.createdOwners = new Refob<?>[context.EntryFieldSize];
-        this.createdTargets = new Refob<?>[context.EntryFieldSize];
-        this.spawnedActors = new Refob<?>[context.EntryFieldSize];
-        this.updatedRefobs = new Refob<?>[context.EntryFieldSize];
+        this.createdOwners = new RefInfo[context.EntryFieldSize];
+        this.createdTargets = new RefInfo[context.EntryFieldSize];
+        this.spawnedActors = new RefInfo[context.EntryFieldSize];
+        this.updatedRefobs = new RefInfo[context.EntryFieldSize];
         this.createdIdx = 0;
         this.spawnedIdx = 0;
         this.updatedIdx = 0;
@@ -50,7 +50,7 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
         return createdIdx < context.EntryFieldSize;
     }
 
-    public void recordNewRefob(Refob<?> owner, Refob<?> target) {
+    public void recordNewRefob(RefInfo owner, RefInfo target) {
         assert(canRecordNewRefob());
         int i = createdIdx++;
         createdOwners[i] = owner;
@@ -61,16 +61,16 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
         return spawnedIdx < context.EntryFieldSize;
     }
 
-    public void recordNewActor(Refob<?> child) {
+    public void recordNewActor(RefInfo child) {
         assert(canRecordNewActor());
         spawnedActors[spawnedIdx++] = child;
     }
 
-    public boolean canRecordUpdatedRefob(Refob<?> refob) {
+    public boolean canRecordUpdatedRefob(RefInfo refob) {
         return refob.hasBeenRecorded() || updatedIdx < context.EntryFieldSize;
     }
 
-    public void recordUpdatedRefob(Refob<?> refob) {
+    public void recordUpdatedRefob(RefInfo refob) {
         assert(canRecordUpdatedRefob(refob));
         if (refob.hasBeenRecorded())
             return;

@@ -3,7 +3,8 @@ package org.apache.pekko.uigc
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.{PostStop, Signal}
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
-import org.apache.pekko.uigc.interfaces.Message
+import org.apache.pekko.uigc.actor.typed._
+import org.apache.pekko.uigc.actor.typed.scaladsl._
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import java.util.concurrent.{CountDownLatch, TimeUnit}
@@ -40,6 +41,8 @@ class RandomSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
       timers: TimerScheduler[Msg]
   ) extends AbstractBehavior[Msg](context) {
 
+    private def isRoot: Boolean = timers != null
+
     private var acquaintances: Set[ActorRef[Msg]] = Set()
 
     override def onMessage(msg: Msg): Behavior[Msg] =
@@ -55,19 +58,22 @@ class RandomSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
       }
 
     private def doSomeActions(): Unit = {
-      if (SpawnCounter.get() >= MAX_ACTORS) {
-        if (timers != null) {
-          // Root actor stops the timer and releases all acquaintances, allowing them to become garbage
-          // once they stop receiving messages.
-          println(s"Spawned $MAX_ACTORS actors. Releasing all acquaintances...")
-          context.release(acquaintances)
+      if (SpawnCounter.get() >= MAX_ACTORS && isRoot) {
+        // Root actor stops taking actions after all actors have been spawned.
+        if (acquaintances.nonEmpty) {
+          println(s"Spawned $MAX_ACTORS actors. Root actor releasing all acquaintances...")
+          //context.release(acquaintances)
           acquaintances = Set()
-          timers.cancelAll()
+          System.gc()
         }
-        return
       }
-      doSomething()
-      doSomething()
+      else {
+        // Either this actor is not the root, or there are still actors to spawn.
+        // 1. Non-root actors should always do something when it gets a message.
+        // 2. If the actor is the root, it should take take actions until all actors have been spawned.
+        doSomething()
+        doSomething()
+      }
     }
 
     private def doSomething(): Unit = {
@@ -84,7 +90,7 @@ class RandomSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
       } else if (p < 0.6 && acquaintances.nonEmpty) {
         val actor = randomItem(acquaintances)
         acquaintances = acquaintances - actor
-        context.release(actor)
+        //context.release(actor)
       } else if (p < 0.8 && acquaintances.nonEmpty) {
         randomItem(acquaintances) ! Ping()
       }
