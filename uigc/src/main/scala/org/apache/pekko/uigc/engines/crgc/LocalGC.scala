@@ -66,6 +66,9 @@ class LocalGC extends Actor with Timers {
   private var deltaGraphID: Int = 0
   private var deltaGraph = DeltaGraph.initialize(thisAddress, engine.crgcContext)
 
+  // Statistics
+  private var wakeupCount = 0
+
   if (numNodes == 1) {
     start()
   } else {
@@ -142,6 +145,7 @@ class LocalGC extends Actor with Timers {
     // shadowGraph.assertEquals(testGraph)
 
     case Wakeup =>
+      wakeupCount += 1
       // println("Bookkeeper woke up!")
       val entryProcessingStats = new ProcessingEntries()
       entryProcessingStats.begin()

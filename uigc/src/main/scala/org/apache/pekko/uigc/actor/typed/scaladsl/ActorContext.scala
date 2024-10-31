@@ -9,6 +9,7 @@ import org.apache.pekko.uigc.interfaces.{GCMessage, SpawnInfo, State}
 import org.apache.pekko.uigc.actor.typed._
 import org.apache.pekko.util.Timeout
 
+import java.lang.ref.ReferenceQueue
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{Await, Future}
 
@@ -24,8 +25,9 @@ class ActorContext[T <: Message](
 ) {
 
   private[pekko] val engine: Engine = UIGC(typedContext.system)
-
   private[pekko] val state: State = engine.initState(typedContext.classicActorContext, spawnInfo)
+  private[pekko] val phantomBuffer: PhantomBuffer = new PhantomBuffer()
+  private[pekko] val phantomQueue: ReferenceQueue[ActorRef[_]] = new ReferenceQueue()
 
   val self: ActorRef[T] = {
     val refInfo = engine.getSelfRefInfo(state, typedContext.classicActorContext)
@@ -53,7 +55,9 @@ class ActorContext[T <: Message](
       state,
       typedContext.classicActorContext
     )
-    new ActorRef[S](refInfo.ref, refInfo)
+    val ref = new ActorRef[S](refInfo.ref, refInfo)
+    registerPhantom(ref)
+    ref
   }
 
   def spawnRemote[S <: Message](
@@ -73,7 +77,9 @@ class ActorContext[T <: Message](
     }
 
     val refInfo = engine.spawn(info => spawnIt(info).classicRef, state, typedContext.classicActorContext)
-    new ActorRef[S](refInfo.ref, refInfo)
+    val ref = new ActorRef[S](refInfo.ref, refInfo)
+    registerPhantom(ref)
+    ref
   }
 
   /** Spawn a new anonymous actor into the GC system.
@@ -91,7 +97,9 @@ class ActorContext[T <: Message](
       state,
       typedContext.classicActorContext
     )
-    new ActorRef[S](refInfo.ref, refInfo)
+    val ref = new ActorRef[S](refInfo.ref, refInfo)
+    registerPhantom(ref)
+    ref
   }
 
   /** Creates a reference to an actor to be sent to another actor and adds it to the created
@@ -109,7 +117,38 @@ class ActorContext[T <: Message](
     */
   def createRef[S <: Message](target: ActorRef[S], owner: ActorRef[Nothing]): ActorRef[S] = {
     val refInfo = engine.createRef(target.refInfo, owner.refInfo, state, typedContext.classicActorContext)
+    // No need to register phantom references that are going to be sent to another actor.
     new ActorRef[S](target.ref, refInfo)
+  }
+
+  /**
+   * When actor A gets a reference x to actor B, the former needs to register a phantom
+   * that points to x. When x is garbage collected, the phantom will be added to [[phantomQueue]].
+   * @param ref A reference this actor has just acquired.
+   */
+  private[pekko] def registerPhantom(ref: ActorRef[_]): Unit = {
+    val phantom = new PhantomActorRef(ref, phantomQueue)
+    phantomBuffer.add(phantom)
+  }
+
+  /**
+   * Check for references that have been garbage collected, and deactivate them by calling
+   * [[Engine.deactivate]].
+   */
+  private[pekko] def checkForGarbageReferences(): Unit = {
+    // Deactivate all references in the phantom queue and then clear them from the buffer.
+    var numDeactivated = 0
+    var x = phantomQueue.poll()
+    while (x != null) {
+      numDeactivated += 1
+      val phantom = x.asInstanceOf[PhantomActorRef]
+      phantom.deactivate()
+      engine.deactivate(phantom.refInfo, state, typedContext.classicActorContext)
+      x = phantomQueue.poll()
+    }
+    if (numDeactivated > 0) {
+      phantomBuffer.cull()
+    }
   }
 
 }

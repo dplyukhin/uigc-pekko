@@ -41,6 +41,8 @@ class RandomSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
       timers: TimerScheduler[Msg]
   ) extends AbstractBehavior[Msg](context) {
 
+    private def isRoot: Boolean = timers != null
+
     private var acquaintances: Set[ActorRef[Msg]] = Set()
 
     override def onMessage(msg: Msg): Behavior[Msg] =
@@ -56,19 +58,22 @@ class RandomSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
       }
 
     private def doSomeActions(): Unit = {
-      if (SpawnCounter.get() >= MAX_ACTORS) {
-        if (timers != null) {
-          // Root actor stops the timer and releases all acquaintances, allowing them to become garbage
-          // once they stop receiving messages.
+      if (SpawnCounter.get() >= MAX_ACTORS && isRoot) {
+        // Root actor stops taking actions after all actors have been spawned.
+        if (acquaintances.nonEmpty) {
           println(s"Spawned $MAX_ACTORS actors. Root actor releasing all acquaintances...")
           //context.release(acquaintances)
           acquaintances = Set()
           System.gc()
         }
-        return
       }
-      doSomething()
-      doSomething()
+      else {
+        // Either this actor is not the root, or there are still actors to spawn.
+        // 1. Non-root actors should always do something when it gets a message.
+        // 2. If the actor is the root, it should take take actions until all actors have been spawned.
+        doSomething()
+        doSomething()
+      }
     }
 
     private def doSomething(): Unit = {
