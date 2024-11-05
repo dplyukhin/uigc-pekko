@@ -1,12 +1,13 @@
 package org.apache.pekko.uigc.engines.crgc
 
 import org.apache.pekko.actor
+import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.uigc.{interfaces => uigc}
 
 import java.io.{IOException, ObjectInputStream, ObjectOutputStream}
 
 class RefInfo(
-     var target: actor.ActorRef,
+     var target: actor.ActorRef = null,
      /**
      * This field is read by actors that create new refobs and written-to by
      * the GC. Adding @volatile makes it more likely that the parent actor will
@@ -14,8 +15,10 @@ class RefInfo(
      * reads a stale value of this field. We can remove @volatile if it worsens
      * performance.
      */
-     @volatile private[pekko] var targetShadow: Shadow
-) extends uigc.RefInfo(target) with Serializable {
+     @volatile private[pekko] var targetShadow: Shadow = null
+) extends uigc.RefInfo with Serializable {
+
+  override def ref: ActorRef = target
 
   private var _hasBeenRecorded: Boolean = false
   private var _info: Short = RefobInfo.activeRefob
