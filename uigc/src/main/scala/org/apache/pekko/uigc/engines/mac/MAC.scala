@@ -16,7 +16,9 @@ object MAC {
 
   private val RC_INC: Long = 255
 
-  case class RefInfo(target: actor.ActorRef) extends uigc.RefInfo(target)
+  case class RefInfo(target: actor.ActorRef) extends uigc.RefInfo {
+    override def ref: actor.ActorRef = target
+  }
 
   ////////////////////////////////////////////////////////////////////////////////
   ///////////////////////////////// MESSAGES /////////////////////////////////////

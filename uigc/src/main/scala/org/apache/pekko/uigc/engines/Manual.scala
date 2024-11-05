@@ -1,6 +1,7 @@
 package org.apache.pekko.uigc.engines
 
 import org.apache.pekko.actor
+import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.uigc.{interfaces => uigc}
 
 object Manual {
@@ -8,7 +9,9 @@ object Manual {
 
   case class GCMessage[+T](payload: T, refs: Iterable[WrappedActorRef]) extends uigc.GCMessage[T]
 
-  case class WrappedActorRef(target: actor.ActorRef) extends uigc.RefInfo(target)
+  case class WrappedActorRef(target: actor.ActorRef) extends uigc.RefInfo {
+    override def ref: ActorRef = target
+  }
 
   case object Info extends SpawnInfo
 
