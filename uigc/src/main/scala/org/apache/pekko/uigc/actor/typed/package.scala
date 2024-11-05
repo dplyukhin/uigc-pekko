@@ -6,7 +6,7 @@ import org.apache.pekko.uigc.actor.typed.scaladsl.{ActorContext, Behaviors}
 package object typed {
 
   /** Convenience object that re-exports the unmanaged typed API. */
-  private[pekko] object unmanaged {
+  object unmanaged {
     import org.apache.pekko.actor.typed
     import org.apache.pekko.actor.typed.scaladsl
     type ActorRef[-T] = typed.ActorRef[T]
