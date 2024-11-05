@@ -6,12 +6,13 @@ import org.apache.pekko.actor.typed.internal.adapter.ActorRefAdapter
 import org.apache.pekko.uigc.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.uigc.interfaces.RefInfo
 
+import java.io.{IOException, ObjectInputStream, ObjectOutputStream}
 import scala.annotation.unchecked.uncheckedVariance
 
 class ActorRef[-T <: Message] private[pekko] (
-                                               private[pekko] val ref: actor.ActorRef,
-                                               private[pekko] val refInfo: RefInfo
-                                             ) {
+  private[pekko] var ref: actor.ActorRef = null,
+  private[pekko] var refInfo: RefInfo = null
+) extends Serializable {
 
   def name: ActorName = ActorRefAdapter(ref)
 
@@ -50,4 +51,18 @@ class ActorRef[-T <: Message] private[pekko] (
   def path: ActorPath = ref.path
 
   def compareTo(o: ActorRef[_]): Int = ref.compareTo(o.ref)
+
+  override def toString: String = ref.toString
+
+  // We serialize TypedActorRef by serializing the RefInfo
+
+  @throws(classOf[IOException])
+  private def writeObject(out: ObjectOutputStream): Unit =
+    out.writeObject(refInfo)
+
+  @throws(classOf[IOException])
+  private def readObject(in: ObjectInputStream): Unit = {
+    this.refInfo = in.readObject().asInstanceOf[RefInfo]
+    this.ref = this.refInfo.ref
+  }
 }
