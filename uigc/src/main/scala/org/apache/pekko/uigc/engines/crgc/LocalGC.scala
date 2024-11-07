@@ -65,6 +65,8 @@ class LocalGC extends Actor with Timers {
   // private val testGraph = new ShadowGraph()
   private var deltaGraphID: Int = 0
   private var deltaGraph = DeltaGraph.initialize(thisAddress, engine.crgcContext)
+  private var nextEntryPool: Int = 0
+
 
   // Statistics
   private var wakeupCount = 0
@@ -170,7 +172,10 @@ class LocalGC extends Actor with Timers {
 
           // Put back the entry
           entry.clean()
-          CRGC.EntryPool.add(entry)
+          val idx: Int = nextEntryPool % CRGC.NUM_ENTRY_POOLS
+          nextEntryPool += 1
+          CRGC.EntryPools(idx).add(entry)
+
           // Try and get another one
           entry = queue.poll()
         }

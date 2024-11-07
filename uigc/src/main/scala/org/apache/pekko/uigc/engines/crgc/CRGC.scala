@@ -13,12 +13,19 @@ import org.apache.pekko.uigc.{interfaces => uigc}
 import java.util.concurrent.ConcurrentLinkedQueue
 
 object CRGC {
+  val NUM_ENTRY_POOLS = 8
+  val NUM_ENTRY_QUEUES = 8
 
   /** The pool of fresh entries */
-  val EntryPool: ConcurrentLinkedQueue[Entry] = new ConcurrentLinkedQueue[Entry]()
+  val EntryPools: Array[ConcurrentLinkedQueue[Entry]] = Array.fill(NUM_ENTRY_POOLS)(new ConcurrentLinkedQueue[Entry]())
+
+  def getEntryPool(thread: Thread): ConcurrentLinkedQueue[Entry] = {
+    val idx = thread.getId.toInt % EntryPools.length
+    EntryPools(idx)
+  }
 
   /** The queue of entries sent to the local GC */
-  val EntryQueues: Array[ConcurrentLinkedQueue[Entry]] = Array.fill(8)(new ConcurrentLinkedQueue[Entry]())
+  val EntryQueues: Array[ConcurrentLinkedQueue[Entry]] = Array.fill(NUM_ENTRY_QUEUES)(new ConcurrentLinkedQueue[Entry]())
 
   def getEntryQueue(ref: actor.ActorRef): ConcurrentLinkedQueue[Entry] = {
     val idx = Math.abs(ref.hashCode % EntryQueues.length)
@@ -180,7 +187,7 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
   ): Unit = {
     val metrics = new EntrySendEvent()
     metrics.begin()
-    var entry = CRGC.EntryPool.poll()
+    var entry = CRGC.getEntryPool(Thread.currentThread()).poll()
     if (entry == null) {
       entry = new Entry(crgcContext)
       metrics.allocatedMemory = true
