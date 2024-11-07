@@ -171,7 +171,6 @@ class LocalGC extends Actor with Timers {
           }
 
           // Put back the entry
-          entry.clean()
           val idx: Int = nextEntryPool % CRGC.NUM_ENTRY_POOLS
           nextEntryPool += 1
           CRGC.EntryPools(idx).add(entry)

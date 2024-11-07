@@ -101,11 +101,19 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
             this.createdOwners[i] = null;
             this.createdTargets[i] = null;
         }
+        // Add null terminators to the end of the arrays if they're underfull
+        if (createdIdx < context.EntryFieldSize) {
+            entry.createdOwners[createdIdx] = null;
+            entry.createdTargets[createdIdx] = null;
+        }
         createdIdx = 0;
 
         for (int i = 0; i < spawnedIdx; i++) {
             entry.spawnedActors[i] = this.spawnedActors[i];
             this.spawnedActors[i] = null;
+        }
+        if (spawnedIdx < context.EntryFieldSize) {
+            entry.spawnedActors[spawnedIdx] = null;
         }
         spawnedIdx = 0;
 
@@ -117,6 +125,10 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
             entry.updatedInfos[i] = this.updatedRefobs[i].info();
             this.updatedRefobs[i].reset();
             this.updatedRefobs[i] = null;
+        }
+        if (updatedIdx < context.EntryFieldSize) {
+            entry.updatedRefs[updatedIdx] = null;
+            entry.updatedInfos[updatedIdx] = 0;
         }
         updatedIdx = 0;
 
