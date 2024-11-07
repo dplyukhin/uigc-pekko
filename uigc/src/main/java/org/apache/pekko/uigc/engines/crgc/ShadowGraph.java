@@ -1,5 +1,6 @@
 package org.apache.pekko.uigc.engines.crgc;
 
+import org.agrona.collections.Object2IntHashMap;
 import org.apache.pekko.actor.Address;
 import org.apache.pekko.actor.ActorRef;
 import org.apache.pekko.uigc.engines.crgc.jfr.TracingEvent;
@@ -61,8 +62,8 @@ public class ShadowGraph {
         return shadow;
     }
 
-    public void updateOutgoing(Map<Shadow, Integer> outgoing, Shadow target, int delta) {
-        int count = outgoing.getOrDefault(target, 0);
+    public void updateOutgoing(Object2IntHashMap<Shadow> outgoing, Shadow target, int delta) {
+        int count = outgoing.getValue(target);
         if (count + delta == 0) {
             // Instead of writing zero, we delete the count.
             outgoing.remove(target);
