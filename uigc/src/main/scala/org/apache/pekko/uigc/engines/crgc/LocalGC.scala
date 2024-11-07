@@ -150,29 +150,30 @@ class LocalGC extends Actor with Timers {
       val entryProcessingStats = new ProcessingEntries()
       entryProcessingStats.begin()
 
-      val queue = engine.Queue
       var count = 0
       var deltaCount = 0
-      var entry: Entry = queue.poll()
-      while (entry != null) {
-        count += 1
-        shadowGraph.mergeEntry(entry)
-        // testGraph.mergeEntry(entry)
-        // shadowGraph.assertEquals(testGraph)
+      for (queue <- CRGC.EntryQueues) {
+        var entry: Entry = queue.poll()
+        while (entry != null) {
+          count += 1
+          shadowGraph.mergeEntry(entry)
+          // testGraph.mergeEntry(entry)
+          // shadowGraph.assertEquals(testGraph)
 
-        if (numNodes > 1) {
-          deltaGraph.mergeEntry(entry)
-          if (deltaGraph.isFull) {
-            deltaCount += 1
-            finalizeDeltaGraph()
+          if (numNodes > 1) {
+            deltaGraph.mergeEntry(entry)
+            if (deltaGraph.isFull) {
+              deltaCount += 1
+              finalizeDeltaGraph()
+            }
           }
-        }
 
-        // Put back the entry
-        entry.clean()
-        CRGC.EntryPool.add(entry)
-        // Try and get another one
-        entry = queue.poll()
+          // Put back the entry
+          entry.clean()
+          CRGC.EntryPool.add(entry)
+          // Try and get another one
+          entry = queue.poll()
+        }
       }
 
       if (numNodes > 1 && deltaGraph.nonEmpty()) {

@@ -14,7 +14,16 @@ import java.util.concurrent.ConcurrentLinkedQueue
 
 object CRGC {
 
+  /** The pool of fresh entries */
   val EntryPool: ConcurrentLinkedQueue[Entry] = new ConcurrentLinkedQueue[Entry]()
+
+  /** The queue of entries sent to the local GC */
+  val EntryQueues: Array[ConcurrentLinkedQueue[Entry]] = Array.fill(8)(new ConcurrentLinkedQueue[Entry]())
+
+  def getEntryQueue(ref: actor.ActorRef): ConcurrentLinkedQueue[Entry] = {
+    val idx = Math.abs(ref.hashCode % EntryQueues.length)
+    EntryQueues(idx)
+  }
 
   trait CollectionStyle
 
@@ -46,9 +55,6 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
       case "on-idle"  => OnIdle
     }
   val crgcContext = new Context(config)
-
-  // This could be split into multiple queues if contention becomes high
-  val Queue: ConcurrentLinkedQueue[Entry] = new ConcurrentLinkedQueue[Entry]()
 
   val bookkeeper: org.apache.pekko.actor.ActorRef =
     system.systemActorOf(
@@ -180,7 +186,7 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
       metrics.allocatedMemory = true
     }
     state.flushToEntry(isBusy, entry)
-    Queue.add(entry)
+    getEntryQueue(state.self.ref).add(entry)
     metrics.commit()
   }
 
