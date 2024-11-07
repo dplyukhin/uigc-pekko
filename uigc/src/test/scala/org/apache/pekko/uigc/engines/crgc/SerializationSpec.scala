@@ -88,7 +88,7 @@ class SerializationSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
       state1.recordNewActor(refob2)
       refob2.incSendCount()
       state1.recordUpdatedRefob(refob2)
-      val entry = new Entry(crgcContext)
+      val entry = new Entry(crgcContext, 0)
       state1.flushToEntry(false, entry)
 
       val graph = DeltaGraph.initialize(address, crgcContext)

@@ -14,14 +14,13 @@ import java.util.concurrent.ConcurrentLinkedQueue
 
 object CRGC {
   val NUM_ENTRY_POOLS = 8
-  val NUM_ENTRY_QUEUES = 8
+  val NUM_ENTRY_QUEUES = 16
 
   /** The pool of fresh entries */
   val EntryPools: Array[ConcurrentLinkedQueue[Entry]] = Array.fill(NUM_ENTRY_POOLS)(new ConcurrentLinkedQueue[Entry]())
 
-  def getEntryPool(thread: Thread): ConcurrentLinkedQueue[Entry] = {
-    val idx = thread.getId.toInt % EntryPools.length
-    EntryPools(idx)
+  def getEntryPoolID(thread: Thread): Int = {
+    thread.getId.toInt % EntryPools.length
   }
 
   /** The queue of entries sent to the local GC */
@@ -187,9 +186,10 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
   ): Unit = {
     val metrics = new EntrySendEvent()
     metrics.begin()
-    var entry = CRGC.getEntryPool(Thread.currentThread()).poll()
+    val idx = getEntryPoolID(Thread.currentThread())
+    var entry = CRGC.EntryPools(idx).poll()
     if (entry == null) {
-      entry = new Entry(crgcContext)
+      entry = new Entry(crgcContext, idx)
       metrics.allocatedMemory = true
     }
     state.flushToEntry(isBusy, entry)

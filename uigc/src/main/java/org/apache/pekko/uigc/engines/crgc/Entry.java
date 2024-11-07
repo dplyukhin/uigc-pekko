@@ -10,18 +10,21 @@ public class Entry {
     public RefInfo[] updatedRefs;
     public short[] updatedInfos;
     public short recvCount;
+    public int threadPoolID;
     public boolean isBusy;
     public boolean isRoot;
 
-    public Entry(Context context) {
-        self           = null;
-        createdOwners  = new RefInfo[context.EntryFieldSize];
-        createdTargets = new RefInfo[context.EntryFieldSize];
-        spawnedActors  = new RefInfo[context.EntryFieldSize];
-        updatedRefs    = new RefInfo[context.EntryFieldSize];
-        updatedInfos   = new short[context.EntryFieldSize];
-        isBusy         = false;
-        isRoot         = false;
+    public Entry(Context context, int threadPoolID) {
+        this.self           = null;
+        this.createdOwners  = new RefInfo[context.EntryFieldSize];
+        this.createdTargets = new RefInfo[context.EntryFieldSize];
+        this.spawnedActors  = new RefInfo[context.EntryFieldSize];
+        this.updatedRefs    = new RefInfo[context.EntryFieldSize];
+        this.updatedInfos   = new short[context.EntryFieldSize];
+        this.recvCount      = 0;
+        this.threadPoolID   = threadPoolID;
+        this.isBusy         = false;
+        this.isRoot         = false;
     }
 
     public void clean() {
