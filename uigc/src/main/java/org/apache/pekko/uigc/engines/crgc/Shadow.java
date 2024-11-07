@@ -9,7 +9,6 @@ import java.util.Objects;
 
 public class Shadow {
     ActorRef self;
-    Address location;
     /**
      * A collection of actors that this actor may be acquainted with. The value of <tt>outgoing(b)</tt> is the
      * number of references this actor appears to have for <tt>b</tt>. The value may be negative, meaning this

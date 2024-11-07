@@ -47,7 +47,6 @@ public class ShadowGraph {
         totalActorsSeen++;
         // Haven't heard of this actor yet. Create a shadow for it.
         Shadow shadow = new Shadow();
-        shadow.location = ref.path().address();
         shadow.self = ref;
         shadow.mark = !MARKED;
             // The value of MARKED flips on every GC scan. Make sure this shadow is unmarked.
@@ -161,7 +160,7 @@ public class ShadowGraph {
         // 2. All actors have their undelivered message counts adjusted.
         // 3. All actors have their outgoing references adjusted.
         for (Shadow shadow : from) {
-            if (shadow.location.equals(log.nodeAddress)) {
+            if (shadow.self.path().address().equals(log.nodeAddress)) {
                 shadow.isHalted = true;
             }
             UndoLog.Field field = log.admitted.get(shadow.self);
@@ -304,7 +303,7 @@ public class ShadowGraph {
         // Mark everything reachable by `location`.
         ArrayList<Shadow> to = new ArrayList<>();
         for (Shadow shadow : from) {
-            if (shadow.location.equals(location)) {
+            if (shadow.self.path().address().equals(location)) {
                 to.add(shadow);
                 shadow.mark = MARKED;
             }
@@ -333,8 +332,8 @@ public class ShadowGraph {
     public void addressesInGraph() {
         HashMap<Address, Integer> addresses = new HashMap<>();
         for (Shadow shadow : from) {
-            int count = addresses.getOrDefault(shadow.location, 0);
-            addresses.put(shadow.location, count+1);
+            int count = addresses.getOrDefault(shadow.self.path().address(), 0);
+            addresses.put(shadow.self.path().address(), count+1);
         }
         for (Map.Entry<Address, Integer> entry : addresses.entrySet()) {
             System.out.println(entry.getValue() + " uncollected at " + entry.getKey());
