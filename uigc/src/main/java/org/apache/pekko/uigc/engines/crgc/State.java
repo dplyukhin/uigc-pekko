@@ -27,6 +27,14 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
     boolean stopRequested;
     Context context;
 
+    public static int CREATED_ACTORS_FULL = 0;
+    public static int SPAWNED_ACTORS_FULL = 1;
+    public static int UPDATED_REFOBS_FULL = 2;
+    public static int RECV_COUNT_FULL = 3;
+    public static int BLOCKED = 4;
+    public static int IDLE = 5;
+    public static int WAVE = 6;
+
     public State(RefInfo self, Context context) {
         this.self = self;
         this.context = context;
@@ -87,9 +95,10 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
         recvCount++;
     }
 
-    public void flushToEntry(boolean isBusy, Entry entry) {
+    public void flushToEntry(boolean isBusy, Entry entry, int reason) {
         EntryFlushEvent metrics = new EntryFlushEvent();
         metrics.recvCount = recvCount;
+        //System.out.println(self.ref() + " flushing because " + reason);
 
         entry.self = self;
         entry.isBusy = isBusy;
