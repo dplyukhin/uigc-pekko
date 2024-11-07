@@ -37,4 +37,20 @@ public class Entry {
         isBusy = false;
         isRoot = false;
     }
+
+    @Override
+    public String toString() {
+        return "Entry{" +
+                "\nself=" + self +
+                "\n, createdOwners=" + Arrays.toString(createdOwners) +
+                "\n, createdTargets=" + Arrays.toString(createdTargets) +
+                "\n, spawnedActors=" + Arrays.toString(spawnedActors) +
+                "\n, updatedRefs=" + Arrays.toString(updatedRefs) +
+                "\n, updatedInfos=" + Arrays.toString(updatedInfos) +
+                "\n, recvCount=" + recvCount +
+                "\n, threadPoolID=" + threadPoolID +
+                "\n, isBusy=" + isBusy +
+                "\n, isRoot=" + isRoot +
+                "\n}";
+    }
 }
