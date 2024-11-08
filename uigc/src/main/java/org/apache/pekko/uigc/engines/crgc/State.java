@@ -25,7 +25,7 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
     boolean isRoot;
     /** True if the GC has asked this actor to stop */
     boolean stopRequested;
-    Context context;
+    CrgcConfig crgcConfig;
 
     public static int CREATED_ACTORS_FULL = 0;
     public static int SPAWNED_ACTORS_FULL = 1;
@@ -35,13 +35,13 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
     public static int IDLE = 5;
     public static int WAVE = 6;
 
-    public State(RefInfo self, Context context) {
+    public State(RefInfo self, CrgcConfig crgcConfig) {
         this.self = self;
-        this.context = context;
-        this.createdOwners = new RefInfo[context.EntryFieldSize];
-        this.createdTargets = new RefInfo[context.EntryFieldSize];
-        this.spawnedActors = new RefInfo[context.EntryFieldSize];
-        this.updatedRefobs = new RefInfo[context.EntryFieldSize];
+        this.crgcConfig = crgcConfig;
+        this.createdOwners = new RefInfo[crgcConfig.EntryFieldSize];
+        this.createdTargets = new RefInfo[crgcConfig.EntryFieldSize];
+        this.spawnedActors = new RefInfo[crgcConfig.EntryFieldSize];
+        this.updatedRefobs = new RefInfo[crgcConfig.EntryFieldSize];
         this.createdIdx = 0;
         this.spawnedIdx = 0;
         this.updatedIdx = 0;
@@ -55,7 +55,7 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
     }
 
     public boolean canRecordNewRefob() {
-        return createdIdx < context.EntryFieldSize;
+        return createdIdx < crgcConfig.EntryFieldSize;
     }
 
     public void recordNewRefob(RefInfo owner, RefInfo target) {
@@ -66,7 +66,7 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
     }
 
     public boolean canRecordNewActor() {
-        return spawnedIdx < context.EntryFieldSize;
+        return spawnedIdx < crgcConfig.EntryFieldSize;
     }
 
     public void recordNewActor(RefInfo child) {
@@ -75,7 +75,7 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
     }
 
     public boolean canRecordUpdatedRefob(RefInfo refob) {
-        return refob.hasBeenRecorded() || updatedIdx < context.EntryFieldSize;
+        return refob.hasBeenRecorded() || updatedIdx < crgcConfig.EntryFieldSize;
     }
 
     public void recordUpdatedRefob(RefInfo refob) {
@@ -111,7 +111,7 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
             this.createdTargets[i] = null;
         }
         // Add null terminators to the end of the arrays if they're underfull
-        if (createdIdx < context.EntryFieldSize) {
+        if (createdIdx < crgcConfig.EntryFieldSize) {
             entry.createdOwners[createdIdx] = null;
             entry.createdTargets[createdIdx] = null;
         }
@@ -121,7 +121,7 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
             entry.spawnedActors[i] = this.spawnedActors[i];
             this.spawnedActors[i] = null;
         }
-        if (spawnedIdx < context.EntryFieldSize) {
+        if (spawnedIdx < crgcConfig.EntryFieldSize) {
             entry.spawnedActors[spawnedIdx] = null;
         }
         spawnedIdx = 0;
@@ -135,7 +135,7 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
             this.updatedRefobs[i].reset();
             this.updatedRefobs[i] = null;
         }
-        if (updatedIdx < context.EntryFieldSize) {
+        if (updatedIdx < crgcConfig.EntryFieldSize) {
             entry.updatedRefs[updatedIdx] = null;
             entry.updatedInfos[updatedIdx] = 0;
         }

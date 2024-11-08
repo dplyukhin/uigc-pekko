@@ -13,12 +13,12 @@ public class ShadowGraph {
     int totalActorsSeen = 0;
     ArrayList<Shadow> from;
     HashMap<ActorRef, Shadow> shadowMap;
-    Context context;
+    CrgcConfig crgcConfig;
 
-    public ShadowGraph(Context context) {
+    public ShadowGraph(CrgcConfig crgcConfig) {
         this.from = new ArrayList<>();
         this.shadowMap = new HashMap<>();
-        this.context = context;
+        this.crgcConfig = crgcConfig;
     }
 
     public Shadow getShadow(RefInfo refob) {
@@ -82,7 +82,7 @@ public class ShadowGraph {
         selfShadow.isRoot = entry.isRoot;
 
         // Created refs.
-        for (int i = 0; i < context.EntryFieldSize; i++) {
+        for (int i = 0; i < crgcConfig.EntryFieldSize; i++) {
             if (entry.createdOwners[i] == null) break;
             RefInfo owner = entry.createdOwners[i];
             Shadow targetShadow = getShadow(entry.createdTargets[i]);
@@ -93,7 +93,7 @@ public class ShadowGraph {
         }
 
         // Spawned actors.
-        for (int i = 0; i < context.EntryFieldSize; i++) {
+        for (int i = 0; i < crgcConfig.EntryFieldSize; i++) {
             if (entry.spawnedActors[i] == null) break;
             RefInfo child = entry.spawnedActors[i];
 
@@ -104,7 +104,7 @@ public class ShadowGraph {
         }
 
         // Update refs.
-        for (int i = 0; i < context.EntryFieldSize; i++) {
+        for (int i = 0; i < crgcConfig.EntryFieldSize; i++) {
             if (entry.updatedRefs[i] == null) break;
             RefInfo target = entry.updatedRefs[i];
             Shadow targetShadow = getShadow(target);

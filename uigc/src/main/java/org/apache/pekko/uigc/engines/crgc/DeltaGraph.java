@@ -42,7 +42,7 @@ public class DeltaGraph implements Serializable {
     /**
      * CRGC Configuration options.
      */
-    Context context;
+    CrgcConfig crgcConfig;
 
     /**
      * FOR INTERNAL USE ONLY! The serializer wants a public empty constructor.
@@ -57,13 +57,13 @@ public class DeltaGraph implements Serializable {
      *
      * @param address the address of the ActorSystem that created this graph
      */
-    public static DeltaGraph initialize(Address address, Context context) {
+    public static DeltaGraph initialize(Address address, CrgcConfig crgcConfig) {
         DeltaGraph graph = new DeltaGraph();
-        graph.compressionTable = new HashMap<>(context.DeltaGraphSize);
-        graph.shadows = new DeltaShadow[context.DeltaGraphSize];
+        graph.compressionTable = new HashMap<>(crgcConfig.DeltaGraphSize);
+        graph.shadows = new DeltaShadow[crgcConfig.DeltaGraphSize];
         graph.size = 0;
         graph.address = address;
-        graph.context = context;
+        graph.crgcConfig = crgcConfig;
         return graph;
     }
 
@@ -80,7 +80,7 @@ public class DeltaGraph implements Serializable {
         selfShadow.isRoot = entry.isRoot;
 
         // Created refs.
-        for (int i = 0; i < context.EntryFieldSize; i++) {
+        for (int i = 0; i < crgcConfig.EntryFieldSize; i++) {
             if (entry.createdOwners[i] == null) break;
             RefInfo owner = entry.createdOwners[i];
             short targetID = encode(entry.createdTargets[i]);
@@ -92,7 +92,7 @@ public class DeltaGraph implements Serializable {
         }
 
         // Spawned actors.
-        for (int i = 0; i < context.EntryFieldSize; i++) {
+        for (int i = 0; i < crgcConfig.EntryFieldSize; i++) {
             if (entry.spawnedActors[i] == null) break;
             RefInfo child = entry.spawnedActors[i];
 
@@ -104,7 +104,7 @@ public class DeltaGraph implements Serializable {
         }
 
         // Deactivate refs.
-        for (int i = 0; i < context.EntryFieldSize; i++) {
+        for (int i = 0; i < crgcConfig.EntryFieldSize; i++) {
             if (entry.updatedRefs[i] == null) break;
             short info = entry.updatedInfos[i];
             RefInfo target = entry.updatedRefs[i];
@@ -176,7 +176,7 @@ public class DeltaGraph implements Serializable {
          * so many new shadows. So we never fill the delta graph to actual capacity; we
          * tell the GC to finalize the delta graph if the next entry *could potentially*
          * cause an overflow. */
-        return size + (4 * context.EntryFieldSize) + 1 >= context.DeltaGraphSize;
+        return size + (4 * crgcConfig.EntryFieldSize) + 1 >= crgcConfig.DeltaGraphSize;
     }
 
     /**

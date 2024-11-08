@@ -55,7 +55,7 @@ class LocalGC extends Actor with Timers {
 
   private val thisAddress: Address =
     if (numNodes > 1) Cluster(context.system).selfMember.address else null
-  private val shadowGraph = new ShadowGraph(engine.crgcContext)
+  private val shadowGraph = new ShadowGraph(engine.crgcConfig)
   private var remoteGCs: Map[Address, ActorSelection] = Map()
   private var undoLogs: Map[Address, UndoLog] = Map()
   private var downedGCs: Set[Address] = Set()
@@ -64,7 +64,7 @@ class LocalGC extends Actor with Timers {
   private var totalEntries: Int = 0
   // private val testGraph = new ShadowGraph()
   private var deltaGraphID: Int = 0
-  private var deltaGraph = DeltaGraph.initialize(thisAddress, engine.crgcContext)
+  private var deltaGraph = DeltaGraph.initialize(thisAddress, engine.crgcConfig)
 
 
   // Statistics
@@ -208,7 +208,7 @@ class LocalGC extends Actor with Timers {
     for (gc <- remoteGCs.values)
       gc ! DeltaMsg(deltaGraphID, deltaGraph, context.self)
     deltaGraphID += 1
-    deltaGraph = DeltaGraph.initialize(thisAddress, engine.crgcContext)
+    deltaGraph = DeltaGraph.initialize(thisAddress, engine.crgcConfig)
   }
 
   private def addMember(member: Member): Unit =
@@ -228,7 +228,7 @@ class LocalGC extends Actor with Timers {
     // Start processing entries
     timers.startTimerWithFixedDelay(Wakeup, Wakeup, 5.millis)
     // Start triggering GC waves
-    if (engine.collectionStyle == CRGC.Wave) {
+    if (engine.crgcConfig.CollectionStyle == CRGC.Wave) {
       timers.startTimerWithFixedDelay(StartWave, StartWave, waveFrequency.millis)
     }
     // Start asking egress actors to finalize entries

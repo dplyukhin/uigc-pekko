@@ -71,7 +71,7 @@ class SerializationSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
   "Delta Graphs" must {
 
     val address: Address = system.address
-    val crgcContext = new Context(system.settings.config)
+    val crgcContext = new CrgcConfig(system.settings.config)
 
     "serialize and deserialize correctly - empty graphs" in {
       val graph = DeltaGraph.initialize(address, crgcContext)
@@ -89,7 +89,7 @@ class SerializationSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
       refob2.incSendCount()
       state1.recordUpdatedRefob(refob2)
       val entry = new Entry(crgcContext, 0)
-      state1.flushToEntry(false, entry)
+      state1.flushToEntry(false, entry, 0)
 
       val graph = DeltaGraph.initialize(address, crgcContext)
       graph.mergeEntry(entry)

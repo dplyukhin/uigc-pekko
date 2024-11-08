@@ -14,13 +14,13 @@ public class Entry {
     public boolean isBusy;
     public boolean isRoot;
 
-    public Entry(Context context, int threadPoolID) {
+    public Entry(CrgcConfig crgcConfig, int threadPoolID) {
         this.self           = null;
-        this.createdOwners  = new RefInfo[context.EntryFieldSize];
-        this.createdTargets = new RefInfo[context.EntryFieldSize];
-        this.spawnedActors  = new RefInfo[context.EntryFieldSize];
-        this.updatedRefs    = new RefInfo[context.EntryFieldSize];
-        this.updatedInfos   = new short[context.EntryFieldSize];
+        this.createdOwners  = new RefInfo[crgcConfig.EntryFieldSize];
+        this.createdTargets = new RefInfo[crgcConfig.EntryFieldSize];
+        this.spawnedActors  = new RefInfo[crgcConfig.EntryFieldSize];
+        this.updatedRefs    = new RefInfo[crgcConfig.EntryFieldSize];
+        this.updatedInfos   = new short[crgcConfig.EntryFieldSize];
         this.recvCount      = 0;
         this.threadPoolID   = threadPoolID;
         this.isBusy         = false;

@@ -39,9 +39,7 @@ object CRGC {
 
   case object Wave extends CollectionStyle
 
-  private case object OnBlock extends CollectionStyle
-
-  private case object OnIdle extends CollectionStyle
+  case object OnBlock extends CollectionStyle
 
 }
 
@@ -54,13 +52,14 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
   override type StateImpl = crgc.State
 
   val config: Config = system.settings.config
-  val collectionStyle: CollectionStyle =
-    config.getString("uigc.crgc.collection-style") match {
-      case "wave"     => Wave
-      case "on-block" => OnBlock
-      case "on-idle"  => OnIdle
-    }
-  val crgcContext = new Context(config)
+  val crgcConfig = new CrgcConfig(config)
+  crgcConfig.CollectionStyle match {
+    case Wave =>
+      system.log.info("CRGC configured with wave collection")
+    case OnBlock =>
+      system.log.info("CRGC configured with on-block collection")
+  }
+
 
   val bookkeeper: org.apache.pekko.actor.ActorRef =
     system.systemActorOf(
@@ -80,7 +79,7 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
   ): State = {
     val self = context.self
     val selfRefob = new RefInfo(self, targetShadow = null)
-    val state = new State(selfRefob, crgcContext)
+    val state = new State(selfRefob, crgcConfig)
     state.recordNewRefob(selfRefob, selfRefob)
     spawnInfo.creator match {
       case Some(creator) =>
@@ -92,13 +91,11 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
     def onBlock(): Unit =
       sendEntry(state, isBusy=false, reason=State.BLOCKED)
 
-    if (collectionStyle == OnBlock)
+    if (crgcConfig.CollectionStyle == OnBlock)
       context.queue.onFinishedProcessingHook = onBlock
 
-    if (collectionStyle == Wave && state.isRoot)
+    if (crgcConfig.CollectionStyle == Wave && state.isRoot)
       sendEntry(state, isBusy=false, reason=State.WAVE)
-    else if (collectionStyle == OnIdle)
-      sendEntry(state, isBusy=false, reason=State.IDLE)
 
     state
   }
@@ -155,8 +152,6 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
         }
         Engine.ShouldContinue
       case _ =>
-        if (collectionStyle == OnIdle)
-          sendEntry(state, isBusy=false, reason=State.IDLE)
         Engine.ShouldContinue
     }
 
@@ -194,7 +189,7 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
     val idx = getEntryPoolID(Thread.currentThread())
     var entry = CRGC.EntryPools(idx).poll()
     if (entry == null) {
-      entry = new Entry(crgcContext, idx)
+      entry = new Entry(crgcConfig, idx)
       metrics.allocatedMemory = true
     }
     state.flushToEntry(isBusy, entry, reason)
