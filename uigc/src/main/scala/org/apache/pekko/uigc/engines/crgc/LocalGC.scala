@@ -196,8 +196,8 @@ class LocalGC extends Actor with Timers {
       //  shadowGraph.investigateLiveSet()
       // shadowGraph.assertEquals(testGraph)
 
-      println(s"Bookkeeper processed $count entries in ${entryProcessingStats.nanosToProcess/1000} micros\n" +
-          s"and traced in ${entryProcessingStats.nanosToTrace/1000} micros.")
+      //println(s"Bookkeeper processed $count entries in ${entryProcessingStats.nanosToProcess/1000} micros\n" +
+      //    s"and traced in ${entryProcessingStats.nanosToTrace/1000} micros.")
       entryProcessingStats.commit()
 
     case StartWave =>
@@ -226,7 +226,7 @@ class LocalGC extends Actor with Timers {
 
   private def start(): Unit = {
     // Start processing entries
-    timers.startTimerWithFixedDelay(Wakeup, Wakeup, 50.millis)
+    timers.startTimerWithFixedDelay(Wakeup, Wakeup, 5.millis)
     // Start triggering GC waves
     if (engine.collectionStyle == CRGC.Wave) {
       timers.startTimerWithFixedDelay(StartWave, StartWave, waveFrequency.millis)
