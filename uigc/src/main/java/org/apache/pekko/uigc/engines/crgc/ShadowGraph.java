@@ -205,6 +205,7 @@ public class ShadowGraph {
     public void trace(boolean shouldKill) {
         TracingEvent tracingEvent = new TracingEvent();
         tracingEvent.begin();
+        long startTime = System.nanoTime();
 
         //System.out.println("Scanning " + from.size() + " actors...");
         ArrayList<Shadow> to = new ArrayList<>(from.size());
@@ -285,6 +286,7 @@ public class ShadowGraph {
         from = to;
         MARKED = !MARKED;
 
+        tracingEvent.nanosToTrace = System.nanoTime() - startTime;
         tracingEvent.commit();
     }
 

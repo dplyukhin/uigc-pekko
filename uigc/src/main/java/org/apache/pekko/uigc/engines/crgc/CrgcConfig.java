@@ -12,6 +12,8 @@ public class CrgcConfig {
     final public boolean entryPoolEnabled;
     final public int numNodes;
     final public int waveFrequency;
+    final public int entryProcessingFrequency;
+    final public int tracingFrequency;
 
     public CrgcConfig(Config config) {
         DeltaGraphSize = (short) config.getInt("uigc.crgc.delta-graph-size");
@@ -30,6 +32,7 @@ public class CrgcConfig {
         entryPoolEnabled = config.getBoolean("uigc.crgc.entry-pool-enabled");
         numNodes = config.getInt("uigc.crgc.num-nodes");
         waveFrequency = config.getInt("uigc.crgc.wave-frequency");
-
+        entryProcessingFrequency = config.getInt("uigc.crgc.entry-processing-frequency");
+        tracingFrequency = config.getInt("uigc.crgc.tracing-frequency");
     }
 }

@@ -14,6 +14,4 @@ public class ProcessingEntries extends Event {
     @Label("Time to Process Entries (ns)")
     public long nanosToProcess;
 
-    @Label("Time to Trace (ns)")
-    public long nanosToTrace;
 }
