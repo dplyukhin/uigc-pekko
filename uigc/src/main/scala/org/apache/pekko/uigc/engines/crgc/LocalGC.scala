@@ -151,6 +151,7 @@ class LocalGC extends Actor with Timers {
       val entryProcessingStats = new ProcessingEntries()
       entryProcessingStats.begin()
 
+      entryProcessingStats.nanosToProcess = System.nanoTime()
       var count = 0
       var deltaCount = 0
       for (queue <- CRGC.EntryQueues) {
@@ -176,21 +177,28 @@ class LocalGC extends Actor with Timers {
           entry = queue.poll()
         }
       }
+      entryProcessingStats.numEntries = count
+      entryProcessingStats.nanosToProcess = System.nanoTime() - entryProcessingStats.nanosToProcess
 
       if (numNodes > 1 && deltaGraph.nonEmpty()) {
         deltaCount += 1
         finalizeDeltaGraph()
       }
 
-      entryProcessingStats.numEntries = count
-      entryProcessingStats.commit()
 
       totalEntries += count
 
+      entryProcessingStats.nanosToTrace = System.nanoTime()
       shadowGraph.trace(true)
+      entryProcessingStats.nanosToTrace = System.nanoTime() - entryProcessingStats.nanosToTrace
+
       //if (wakeupCount % 100 == 0)
       //  shadowGraph.investigateLiveSet()
       // shadowGraph.assertEquals(testGraph)
+
+      println(s"Bookkeeper processed $count entries in ${entryProcessingStats.nanosToProcess/1000} micros\n" +
+          s"and traced in ${entryProcessingStats.nanosToTrace/1000} micros.")
+      entryProcessingStats.commit()
 
     case StartWave =>
       shadowGraph.startWave()
