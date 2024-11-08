@@ -50,11 +50,8 @@ class LocalGC extends Actor with Timers {
 
   private val engine = UIGC(context.system).asInstanceOf[CRGC]
 
-  private val numNodes = engine.config.getInt("uigc.crgc.num-nodes")
-  private val waveFrequency: Int = engine.config.getInt("uigc.crgc.wave-frequency")
-
   private val thisAddress: Address =
-    if (numNodes > 1) Cluster(context.system).selfMember.address else null
+    if (engine.crgcConfig.numNodes > 1) Cluster(context.system).selfMember.address else null
   private val shadowGraph = new ShadowGraph(engine.crgcConfig)
   private var remoteGCs: Map[Address, ActorSelection] = Map()
   private var undoLogs: Map[Address, UndoLog] = Map()
@@ -70,7 +67,7 @@ class LocalGC extends Actor with Timers {
   // Statistics
   private var wakeupCount = 0
 
-  if (numNodes == 1) {
+  if (engine.crgcConfig.numNodes == 1) {
     start()
   } else {
     Cluster(context.system).subscribe(self, classOf[MemberUp])
@@ -162,7 +159,7 @@ class LocalGC extends Actor with Timers {
           // testGraph.mergeEntry(entry)
           // shadowGraph.assertEquals(testGraph)
 
-          if (numNodes > 1) {
+          if (engine.crgcConfig.numNodes > 1) {
             deltaGraph.mergeEntry(entry)
             if (deltaGraph.isFull) {
               deltaCount += 1
@@ -180,7 +177,7 @@ class LocalGC extends Actor with Timers {
       entryProcessingStats.numEntries = count
       entryProcessingStats.nanosToProcess = System.nanoTime() - entryProcessingStats.nanosToProcess
 
-      if (numNodes > 1 && deltaGraph.nonEmpty()) {
+      if (engine.crgcConfig.numNodes > 1 && deltaGraph.nonEmpty()) {
         deltaCount += 1
         finalizeDeltaGraph()
       }
@@ -219,7 +216,7 @@ class LocalGC extends Actor with Timers {
       remoteGCs = remoteGCs + (addr -> gc)
       if (!undoLogs.contains(addr))
         undoLogs = undoLogs + (addr -> new UndoLog(addr))
-      if (remoteGCs.size + 1 == numNodes) {
+      if (remoteGCs.size + 1 == engine.crgcConfig.numNodes) {
         start()
       }
     }
@@ -229,7 +226,7 @@ class LocalGC extends Actor with Timers {
     timers.startTimerWithFixedDelay(Wakeup, Wakeup, 5.millis)
     // Start triggering GC waves
     if (engine.crgcConfig.CollectionStyle == CRGC.Wave) {
-      timers.startTimerWithFixedDelay(StartWave, StartWave, waveFrequency.millis)
+      timers.startTimerWithFixedDelay(StartWave, StartWave, engine.crgcConfig.waveFrequency.millis)
     }
     // Start asking egress actors to finalize entries
     for ((addr, _) <- remoteGCs)

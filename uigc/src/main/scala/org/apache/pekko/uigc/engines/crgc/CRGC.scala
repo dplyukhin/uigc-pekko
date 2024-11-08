@@ -6,7 +6,6 @@ import org.apache.pekko.remote.artery.{InboundEnvelope, ObjectPool, OutboundEnve
 import org.apache.pekko.stream.stage.GraphStageLogic
 import org.apache.pekko.stream.{FlowShape, Inlet, Outlet}
 import com.typesafe.config.Config
-import org.apache.pekko.uigc.engines.crgc.jfr.EntrySendEvent
 import org.apache.pekko.uigc.engines.{Engine, crgc}
 import org.apache.pekko.uigc.{interfaces => uigc}
 
