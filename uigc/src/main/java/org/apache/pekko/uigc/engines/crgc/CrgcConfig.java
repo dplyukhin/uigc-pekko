@@ -9,6 +9,7 @@ public class CrgcConfig {
     final public short DeltaGraphSize;
     final public int EntryFieldSize;
     final public CRGC.CollectionStyle CollectionStyle;
+    final public boolean entryPoolEnabled;
 
     public CrgcConfig(Config config) {
         DeltaGraphSize = (short) config.getInt("uigc.crgc.delta-graph-size");
@@ -24,5 +25,6 @@ public class CrgcConfig {
             default:
                 throw new IllegalArgumentException("Unknown collection style: " + _collectionStyle);
         }
+        entryPoolEnabled = config.getBoolean("uigc.crgc.entry-pool-enabled");
     }
 }

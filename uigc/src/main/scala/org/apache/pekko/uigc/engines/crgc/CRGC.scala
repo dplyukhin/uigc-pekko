@@ -17,10 +17,27 @@ object CRGC {
   val NUM_ENTRY_QUEUES = 16
 
   /** The pool of fresh entries */
-  val EntryPools: Array[ConcurrentLinkedQueue[Entry]] = Array.fill(NUM_ENTRY_POOLS)(new ConcurrentLinkedQueue[Entry]())
+  private val EntryPools: Array[ConcurrentLinkedQueue[Entry]] =
+    Array.fill(NUM_ENTRY_POOLS)(new ConcurrentLinkedQueue[Entry]())
 
-  def getEntryPoolID(thread: Thread): Int = {
-    thread.getId.toInt % EntryPools.length
+  private def getEntry(thread: Thread, crgcConfig: CrgcConfig): Entry = {
+    if (crgcConfig.entryPoolEnabled) {
+      val idx = thread.getId.toInt % EntryPools.length
+      var entry = CRGC.EntryPools(idx).poll()
+      if (entry == null) {
+        entry = new Entry(crgcConfig, idx)
+      }
+      entry
+    }
+    else {
+      new Entry(crgcConfig, 0)
+    }
+  }
+
+  def releaseEntry(entry: Entry, crgcConfig: CrgcConfig): Unit = {
+    if (crgcConfig.entryPoolEnabled) {
+      CRGC.EntryPools(entry.threadPoolID).add(entry)
+    }
   }
 
   /** The queue of entries sent to the local GC */
@@ -53,13 +70,6 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
 
   val config: Config = system.settings.config
   val crgcConfig = new CrgcConfig(config)
-  crgcConfig.CollectionStyle match {
-    case Wave =>
-      system.log.info("CRGC configured with wave collection")
-    case OnBlock =>
-      system.log.info("CRGC configured with on-block collection")
-  }
-
 
   val bookkeeper: org.apache.pekko.actor.ActorRef =
     system.systemActorOf(
@@ -184,17 +194,9 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
       isBusy: Boolean,
       reason: Int
   ): Unit = {
-    val metrics = new EntrySendEvent()
-    metrics.begin()
-    val idx = getEntryPoolID(Thread.currentThread())
-    var entry = CRGC.EntryPools(idx).poll()
-    if (entry == null) {
-      entry = new Entry(crgcConfig, idx)
-      metrics.allocatedMemory = true
-    }
+    val entry = getEntry(Thread.currentThread(), crgcConfig)
     state.flushToEntry(isBusy, entry, reason)
     getEntryQueue(state.self.ref).add(entry)
-    metrics.commit()
   }
 
   override def preSignalImpl(
