@@ -78,8 +78,8 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
     }
 
     def onBlock(): Unit = {
-      // TODO Don't send an entry if the state hasn't changed since last time
-      sendEntry(state, isBusy=false, reason=State.BLOCKED)
+      if (state.hasChanged)
+        sendEntry(state, isBusy=false, reason=State.BLOCKED)
     }
 
     if (crgcConfig.CollectionStyle == OnBlock)
@@ -132,8 +132,8 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
       case StopMsg =>
         Engine.ShouldStop
       case WaveMsg =>
-        // TODO Don't send an entry if it hasn't changed since the last wave
-        sendEntry(state, isBusy=false, reason=State.WAVE)
+        if (state.hasChanged)
+          sendEntry(state, isBusy=false, reason=State.WAVE)
         val it = ctx.children.iterator
         while (it.hasNext) {
           val child = it.next()

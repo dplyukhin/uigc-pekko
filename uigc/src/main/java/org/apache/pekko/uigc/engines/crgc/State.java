@@ -15,6 +15,8 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
     HashMap<RefInfo, Integer> deactivatedRefs;
     /** Tracks how many messages this actor has received since the last entry */
     int recvCount;
+    /** True iff the actor has anything to report in its next entry */
+    boolean hasChanged;
     /** True iff the actor is a root (i.e. manually collected) */
     boolean isRoot;
     /** True if the GC has asked this actor to stop */
@@ -32,11 +34,15 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
         this.updatedRefobs = null;
         this.deactivatedRefs = null;
         this.recvCount = 0;
+        this.hasChanged = false;
         this.isRoot = false;
         this.stopRequested = false;
     }
 
     public void markAsRoot() {
+        if (!this.isRoot) {
+            this.hasChanged = true;
+        }
         this.isRoot = true;
     }
 
@@ -45,10 +51,12 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
     }
 
     public void recordMessageReceived() {
+        this.hasChanged = true;
         recvCount++;
     }
 
     public void recordUpdatedRefob(RefInfo refob) {
+        this.hasChanged = true;
         if (updatedRefobs == null) {
             updatedRefobs = new ArrayList<>(4);
         }
@@ -56,6 +64,7 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
     }
 
     public void recordDeactivatedRefob(RefInfo refob) {
+        this.hasChanged = true;
         if (deactivatedRefs == null) {
             deactivatedRefs = new HashMap<>();
         }
@@ -64,6 +73,7 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
     }
 
     public void setCreator(RefInfo creator) {
+        this.hasChanged = true;
         this.creator = creator;
     }
 
@@ -100,6 +110,7 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
         this.updatedRefobs = null;
         this.deactivatedRefs = null;
         this.recvCount = 0;
+        this.hasChanged = false;
 
         metrics.commit();
     }
