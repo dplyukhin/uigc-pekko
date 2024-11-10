@@ -80,45 +80,40 @@ public class ShadowGraph {
         selfShadow.recvCount += entry.recvCount;
         selfShadow.isBusy = entry.isBusy;
         selfShadow.isRoot = entry.isRoot;
-
-        // Created refs.
-        for (int i = 0; i < crgcConfig.EntryFieldSize; i++) {
-            if (entry.createdOwners[i] == null) break;
-            RefInfo owner = entry.createdOwners[i];
-            Shadow targetShadow = getShadow(entry.createdTargets[i]);
-
-            // Increment the number of outgoing refs to the target
-            Shadow shadow = getShadow(owner);
-            updateOutgoing(shadow.outgoing, targetShadow, 1);
+        if (entry.creator != null) {
+            Shadow creatorShadow = getShadow(entry.creator);
+            selfShadow.supervisor = creatorShadow;
+            updateOutgoing(creatorShadow.outgoing, selfShadow, 1);
         }
 
-        // Spawned actors.
-        for (int i = 0; i < crgcConfig.EntryFieldSize; i++) {
-            if (entry.spawnedActors[i] == null) break;
-            RefInfo child = entry.spawnedActors[i];
-
-            // Set the child's supervisor field
-            Shadow childShadow = getShadow(child);
-            childShadow.supervisor = selfShadow;
-            // NB: We don't increase the parent's created count; that info is in the child snapshot.
-        }
-
-        // Update refs.
-        for (int i = 0; i < crgcConfig.EntryFieldSize; i++) {
-            if (entry.updatedRefs[i] == null) break;
-            RefInfo target = entry.updatedRefs[i];
-            Shadow targetShadow = getShadow(target);
-            short info = entry.updatedInfos[i];
-            short sendCount = RefobInfo.count(info);
-            boolean isActive = RefobInfo.isActive(info);
-            boolean isDeactivated = !isActive;
-
-            // Update the owner's outgoing references
-            if (sendCount > 0) {
-                targetShadow.recvCount -= sendCount; // may be negative!
+        // Deactivated refs.
+        if (entry.deactivatedRefs != null) {
+            for (Map.Entry<RefInfo, Integer> deactivationEntry : entry.deactivatedRefs.entrySet()) {
+                RefInfo target = deactivationEntry.getKey();
+                int count = deactivationEntry.getValue(); // How many references to target have been deactivated
+                Shadow targetShadow = getShadow(target);
+                updateOutgoing(selfShadow.outgoing, targetShadow, -count);
             }
-            if (isDeactivated) {
-                updateOutgoing(selfShadow.outgoing, targetShadow, -1);
+        }
+
+        // Updated refs.
+        if (entry.updatedRefobs != null) {
+            for (int i = 0; i < entry.updatedRefobs.size(); i++) {
+                RefInfo updatedRef = entry.updatedRefobs.get(i);
+                int sendCount = entry.sendCounts[i]; // The number of messages that self has sent to updatedRef
+                HashMap<RefInfo, Integer> createdRefs = entry.createdRefobs[i];
+                Shadow updatedShadow = getShadow(updatedRef);
+
+                updatedShadow.recvCount -= sendCount; // may become negative!
+
+                if (createdRefs != null) {
+                    for (Map.Entry<RefInfo, Integer> creationEntry : createdRefs.entrySet()) {
+                        RefInfo targetRef = creationEntry.getKey();
+                        int creationCount = creationEntry.getValue(); // The number of refs sent to updatedRef pointing to targetRef
+                        Shadow targetShadow = getShadow(targetRef);
+                        updateOutgoing(updatedShadow.outgoing, targetShadow, creationCount);
+                    }
+                }
             }
         }
 

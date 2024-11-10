@@ -2,50 +2,36 @@ package org.apache.pekko.uigc.engines.crgc;
 
 import org.apache.pekko.uigc.engines.crgc.jfr.EntryFlushEvent;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+
 public class State implements org.apache.pekko.uigc.interfaces.State {
 
-    /** This actor's ref to itself */
     RefInfo self;
-    /** Tracks references created by this actor */
-    RefInfo[] createdOwners;
-    RefInfo[] createdTargets;
-    /** Tracks actors spawned by this actor */
-    RefInfo[] spawnedActors;
+    RefInfo creator;
     /** Tracks all the refobs that have been updated in this entry period */
-    RefInfo[] updatedRefobs;
-    /** Where in the array to insert the next "created" ref */
-    int createdIdx;
-    /** Where in the array to insert the next "spawned" ref */
-    int spawnedIdx;
-    /** Where in the array to insert the next "updated" refob */
-    int updatedIdx;
-    /** Tracks how many messages are received using each reference. */
-    short recvCount;
+    ArrayList<RefInfo> updatedRefobs;
+    /** Tracks how many references to the target actor have been deactivated */
+    HashMap<RefInfo, Integer> deactivatedRefs;
+    /** Tracks how many messages this actor has received since the last entry */
+    int recvCount;
     /** True iff the actor is a root (i.e. manually collected) */
     boolean isRoot;
     /** True if the GC has asked this actor to stop */
     boolean stopRequested;
     CrgcConfig crgcConfig;
 
-    public static int CREATED_ACTORS_FULL = 0;
-    public static int SPAWNED_ACTORS_FULL = 1;
-    public static int UPDATED_REFOBS_FULL = 2;
+    public static int SEND_COUNT_FULL = 1;
     public static int RECV_COUNT_FULL = 3;
     public static int BLOCKED = 4;
-    public static int IDLE = 5;
-    public static int WAVE = 6;
+    public static int WAVE = 5;
 
     public State(RefInfo self, CrgcConfig crgcConfig) {
         this.self = self;
         this.crgcConfig = crgcConfig;
-        this.createdOwners = new RefInfo[crgcConfig.EntryFieldSize];
-        this.createdTargets = new RefInfo[crgcConfig.EntryFieldSize];
-        this.spawnedActors = new RefInfo[crgcConfig.EntryFieldSize];
-        this.updatedRefobs = new RefInfo[crgcConfig.EntryFieldSize];
-        this.createdIdx = 0;
-        this.spawnedIdx = 0;
-        this.updatedIdx = 0;
-        this.recvCount = (short) 0;
+        this.updatedRefobs = null;
+        this.deactivatedRefs = null;
+        this.recvCount = 0;
         this.isRoot = false;
         this.stopRequested = false;
     }
@@ -54,45 +40,31 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
         this.isRoot = true;
     }
 
-    public boolean canRecordNewRefob() {
-        return createdIdx < crgcConfig.EntryFieldSize;
-    }
-
-    public void recordNewRefob(RefInfo owner, RefInfo target) {
-        assert(canRecordNewRefob());
-        int i = createdIdx++;
-        createdOwners[i] = owner;
-        createdTargets[i] = target;
-    }
-
-    public boolean canRecordNewActor() {
-        return spawnedIdx < crgcConfig.EntryFieldSize;
-    }
-
-    public void recordNewActor(RefInfo child) {
-        assert(canRecordNewActor());
-        spawnedActors[spawnedIdx++] = child;
-    }
-
-    public boolean canRecordUpdatedRefob(RefInfo refob) {
-        return refob.hasBeenRecorded() || updatedIdx < crgcConfig.EntryFieldSize;
-    }
-
-    public void recordUpdatedRefob(RefInfo refob) {
-        assert(canRecordUpdatedRefob(refob));
-        if (refob.hasBeenRecorded())
-            return;
-        refob.setHasBeenRecorded();
-        updatedRefobs[updatedIdx++] = refob;
-    }
-
     public boolean canRecordMessageReceived() {
-        return recvCount < Short.MAX_VALUE;
+        return recvCount < Integer.MAX_VALUE;
     }
 
     public void recordMessageReceived() {
-        assert(canRecordMessageReceived());
         recvCount++;
+    }
+
+    public void recordUpdatedRefob(RefInfo refob) {
+        if (updatedRefobs == null) {
+            updatedRefobs = new ArrayList<>(4);
+        }
+        updatedRefobs.add(refob);
+    }
+
+    public void recordDeactivatedRefob(RefInfo refob) {
+        if (deactivatedRefs == null) {
+            deactivatedRefs = new HashMap<>();
+        }
+        int count = deactivatedRefs.getOrDefault(refob, 0);
+        deactivatedRefs.put(refob, count + 1);
+    }
+
+    public void setCreator(RefInfo creator) {
+        this.creator = creator;
     }
 
     public void flushToEntry(boolean isBusy, Entry entry, int reason) {
@@ -100,46 +72,34 @@ public class State implements org.apache.pekko.uigc.interfaces.State {
         metrics.recvCount = recvCount;
         //System.out.println(self.ref() + " flushing because " + reason);
 
+        // Set basic fields
         entry.self = self;
+        entry.creator = creator;
         entry.isBusy = isBusy;
         entry.isRoot = isRoot;
-
-        for (int i = 0; i < createdIdx; i++) {
-            entry.createdOwners[i] = this.createdOwners[i];
-            entry.createdTargets[i] = this.createdTargets[i];
-            this.createdOwners[i] = null;
-            this.createdTargets[i] = null;
-        }
-        // Add null terminators to the end of the arrays if they're underfull
-        if (createdIdx < crgcConfig.EntryFieldSize) {
-            entry.createdOwners[createdIdx] = null;
-            entry.createdTargets[createdIdx] = null;
-        }
-        createdIdx = 0;
-
-        for (int i = 0; i < spawnedIdx; i++) {
-            entry.spawnedActors[i] = this.spawnedActors[i];
-            this.spawnedActors[i] = null;
-        }
-        if (spawnedIdx < crgcConfig.EntryFieldSize) {
-            entry.spawnedActors[spawnedIdx] = null;
-        }
-        spawnedIdx = 0;
-
         entry.recvCount = recvCount;
-        recvCount = (short) 0;
+        entry.updatedRefobs = updatedRefobs;
+        entry.deactivatedRefs = deactivatedRefs;
 
-        for (int i = 0; i < updatedIdx; i++) {
-            entry.updatedRefs[i] = this.updatedRefobs[i];
-            entry.updatedInfos[i] = this.updatedRefobs[i].info();
-            this.updatedRefobs[i].reset();
-            this.updatedRefobs[i] = null;
+        // Set the send counts
+        if (updatedRefobs != null) {
+            entry.sendCounts = new int[updatedRefobs.size()];
+            entry.createdRefobs = new HashMap[entry.sendCounts.length];
+
+            int i = 0;
+            for (RefInfo refInfo : updatedRefobs) {
+                entry.sendCounts[i] = refInfo.sendCount();
+                entry.createdRefobs[i] = refInfo.createdRefs();
+                refInfo.reset();
+                i++;
+            }
         }
-        if (updatedIdx < crgcConfig.EntryFieldSize) {
-            entry.updatedRefs[updatedIdx] = null;
-            entry.updatedInfos[updatedIdx] = 0;
-        }
-        updatedIdx = 0;
+
+        // Reset stuff
+        this.creator = null;
+        this.updatedRefobs = null;
+        this.deactivatedRefs = null;
+        this.recvCount = 0;
 
         metrics.commit();
     }

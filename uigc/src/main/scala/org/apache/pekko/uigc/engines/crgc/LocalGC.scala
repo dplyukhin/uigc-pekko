@@ -175,9 +175,6 @@ class LocalGC extends Actor with Timers {
             }
           }
 
-          // Put back the entry
-          CRGC.releaseEntry(entry, engine.crgcConfig)
-
           // Try and get another one
           entry = queue.poll()
         }

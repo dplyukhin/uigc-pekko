@@ -9,7 +9,6 @@ public class CrgcConfig {
     final public short DeltaGraphSize;
     final public int EntryFieldSize;
     final public CRGC.CollectionStyle CollectionStyle;
-    final public boolean entryPoolEnabled;
     final public int numNodes;
     final public int waveFrequency;
     final public int entryProcessingFrequency;
@@ -29,7 +28,6 @@ public class CrgcConfig {
             default:
                 throw new IllegalArgumentException("Unknown collection style: " + _collectionStyle);
         }
-        entryPoolEnabled = config.getBoolean("uigc.crgc.entry-pool-enabled");
         numNodes = config.getInt("uigc.crgc.num-nodes");
         waveFrequency = config.getInt("uigc.crgc.wave-frequency");
         entryProcessingFrequency = config.getInt("uigc.crgc.entry-processing-frequency");

@@ -79,47 +79,42 @@ public class DeltaGraph implements Serializable {
         selfShadow.isBusy = entry.isBusy;
         selfShadow.isRoot = entry.isRoot;
 
-        // Created refs.
-        for (int i = 0; i < crgcConfig.EntryFieldSize; i++) {
-            if (entry.createdOwners[i] == null) break;
-            RefInfo owner = entry.createdOwners[i];
-            short targetID = encode(entry.createdTargets[i]);
-
-            // Increment the number of outgoing refs to the target
-            short ownerID = encode(owner);
-            DeltaShadow ownerShadow = shadows[ownerID];
-            updateOutgoing(ownerShadow.outgoing, targetID, 1);
+        if (entry.creator != null) {
+            short creatorID = encode(entry.creator);
+            DeltaShadow creatorShadow = shadows[creatorID];
+            selfShadow.supervisor = creatorID;
+            updateOutgoing(creatorShadow.outgoing, selfID, 1);
         }
 
-        // Spawned actors.
-        for (int i = 0; i < crgcConfig.EntryFieldSize; i++) {
-            if (entry.spawnedActors[i] == null) break;
-            RefInfo child = entry.spawnedActors[i];
-
-            // Set the child's supervisor field
-            short childID = encode(child);
-            DeltaShadow childShadow = shadows[childID];
-            childShadow.supervisor = selfID;
-            // NB: We don't increase the parent's created count; that info is in the child snapshot.
-        }
-
-        // Deactivate refs.
-        for (int i = 0; i < crgcConfig.EntryFieldSize; i++) {
-            if (entry.updatedRefs[i] == null) break;
-            short info = entry.updatedInfos[i];
-            RefInfo target = entry.updatedRefs[i];
-            short targetID = encode(target);
-            short sendCount = RefobInfo.count(info);
-            boolean isActive = RefobInfo.isActive(info);
-            boolean isDeactivated = !isActive;
-
-            // Update the owner's outgoing references
-            if (sendCount > 0) {
-                DeltaShadow targetShadow = shadows[targetID];
-                targetShadow.recvCount -= sendCount; // may be negative!
+        // Deactivated refs.
+        if (entry.deactivatedRefs != null) {
+            for (Map.Entry<RefInfo, Integer> deactivationEntry : entry.deactivatedRefs.entrySet()) {
+                RefInfo target = deactivationEntry.getKey();
+                short targetID = encode(target);
+                int count = deactivationEntry.getValue(); // How many references to target have been deactivated
+                updateOutgoing(selfShadow.outgoing, targetID, -count);
             }
-            if (isDeactivated) {
-                updateOutgoing(selfShadow.outgoing, targetID, -1);
+        }
+
+        // Updated refs.
+        if (entry.updatedRefobs != null) {
+            for (int i = 0; i < entry.updatedRefobs.size(); i++) {
+                RefInfo updatedRef = entry.updatedRefobs.get(i);
+                short updatedID = encode(updatedRef);
+                int sendCount = entry.sendCounts[i]; // The number of messages that self has sent to updatedRef
+                HashMap<RefInfo, Integer> createdRefs = entry.createdRefobs[i];
+                DeltaShadow updatedShadow = shadows[updatedID];
+
+                updatedShadow.recvCount -= sendCount; // may become negative!
+
+                if (createdRefs != null) {
+                    for (Map.Entry<RefInfo, Integer> creationEntry : createdRefs.entrySet()) {
+                        RefInfo targetRef = creationEntry.getKey();
+                        short targetID = encode(targetRef);
+                        int creationCount = creationEntry.getValue(); // The number of refs sent to updatedRef pointing to targetRef
+                        updateOutgoing(updatedShadow.outgoing, targetID, creationCount);
+                    }
+                }
             }
         }
     }
