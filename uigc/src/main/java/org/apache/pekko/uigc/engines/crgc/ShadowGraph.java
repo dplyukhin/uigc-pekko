@@ -123,8 +123,8 @@ public class ShadowGraph {
         // This array maps compressed IDs to ActorRefs.
         ActorRef[] decoder = delta.decoder();
 
-        for (short i = 0; i < delta.size; i++) {
-            DeltaShadow deltaShadow = delta.shadows[i];
+        for (short i = 0; i < delta.shadows.size(); i++) {
+            DeltaShadow deltaShadow = delta.shadows.get(i);
             Shadow shadow = getShadow(decoder[i]);
 
             shadow.interned = shadow.interned || deltaShadow.interned;

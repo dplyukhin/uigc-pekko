@@ -40,8 +40,8 @@ public class UndoLog {
         // This will act as a hashmap, mapping compressed IDs to actorRefs.
         ActorRef[] decoder = delta.decoder();
 
-        for (short i = 0; i < delta.size; i++) {
-            DeltaShadow deltaShadow = delta.shadows[i];
+        for (short i = 0; i < delta.shadows.size(); i++) {
+            DeltaShadow deltaShadow = delta.shadows.get(i);
             if (deltaShadow.interned)
                 // We only care about messages sent and references created by this node
                 // *for actors on other nodes*.

@@ -94,7 +94,7 @@ class SerializationSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike {
 
       val graph = DeltaGraph.initialize(address, crgcContext)
       graph.mergeEntry(entry)
-      graph.size shouldEqual 2
+      graph.shadows.size() shouldEqual 2
 
       testKit.serializationTestKit.verifySerialization(graph)
     }

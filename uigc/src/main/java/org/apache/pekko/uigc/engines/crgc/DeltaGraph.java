@@ -5,6 +5,7 @@ import org.apache.pekko.actor.ActorRef;
 import org.apache.pekko.uigc.engines.crgc.jfr.DeltaGraphSerialization;
 
 import java.io.*;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -30,15 +31,11 @@ public class DeltaGraph implements Serializable {
     /**
      * Delta shadows are stored in this array. An actor's compressed ID is its position in the array.
      */
-    DeltaShadow[] shadows;
+    ArrayList<DeltaShadow> shadows;
     /**
      * The address of the node that produced this graph.
      */
     Address address;
-    /**
-     * The number of delta shadows in this graph.
-     */
-    short size;
     /**
      * CRGC Configuration options.
      */
@@ -59,9 +56,8 @@ public class DeltaGraph implements Serializable {
      */
     public static DeltaGraph initialize(Address address, CrgcConfig crgcConfig) {
         DeltaGraph graph = new DeltaGraph();
-        graph.compressionTable = new HashMap<>(crgcConfig.DeltaGraphSize);
-        graph.shadows = new DeltaShadow[crgcConfig.DeltaGraphSize];
-        graph.size = 0;
+        graph.compressionTable = new HashMap<>();
+        graph.shadows = new ArrayList<>();
         graph.address = address;
         graph.crgcConfig = crgcConfig;
         return graph;
@@ -73,7 +69,7 @@ public class DeltaGraph implements Serializable {
     public void mergeEntry(Entry entry) {
         // Local information.
         short selfID = encode(entry.self);
-        DeltaShadow selfShadow = shadows[selfID];
+        DeltaShadow selfShadow = shadows.get(selfID);
         selfShadow.interned = true;
         selfShadow.recvCount += entry.recvCount;
         selfShadow.isBusy = entry.isBusy;
@@ -81,7 +77,7 @@ public class DeltaGraph implements Serializable {
 
         if (entry.creator != null) {
             short creatorID = encode(entry.creator);
-            DeltaShadow creatorShadow = shadows[creatorID];
+            DeltaShadow creatorShadow = shadows.get(creatorID);
             selfShadow.supervisor = creatorID;
             updateOutgoing(creatorShadow.outgoing, selfID, 1);
         }
@@ -103,7 +99,7 @@ public class DeltaGraph implements Serializable {
                 short updatedID = encode(updatedRef);
                 int sendCount = entry.sendCounts[i]; // The number of messages that self has sent to updatedRef
                 HashMap<RefInfo, Integer> createdRefs = entry.createdRefobs[i];
-                DeltaShadow updatedShadow = shadows[updatedID];
+                DeltaShadow updatedShadow = shadows.get(updatedID);
 
                 updatedShadow.recvCount -= sendCount; // may become negative!
 
@@ -144,10 +140,10 @@ public class DeltaGraph implements Serializable {
         if (compressionTable.containsKey(ref))
             return compressionTable.get(ref);
 
-        short id = size++;
-        compressionTable.put(ref, id);
-        shadows[id] = new DeltaShadow();
-        return id;
+        int id = shadows.size();
+        compressionTable.put(ref, (short) id);
+        shadows.add(new DeltaShadow());
+        return (short) id;
     }
 
     /**
@@ -156,7 +152,7 @@ public class DeltaGraph implements Serializable {
      */
     public ActorRef[] decoder() {
         // This will act as a hashmap, mapping compressed IDs to actorRefs.
-        ActorRef[] refs = new ActorRef[this.size];
+        ActorRef[] refs = new ActorRef[this.shadows.size()];
         for (Map.Entry<ActorRef, Short> entry : this.compressionTable.entrySet()) {
             refs[entry.getValue()] = entry.getKey();
         }
@@ -171,14 +167,14 @@ public class DeltaGraph implements Serializable {
          * so many new shadows. So we never fill the delta graph to actual capacity; we
          * tell the GC to finalize the delta graph if the next entry *could potentially*
          * cause an overflow. */
-        return size + (4 * crgcConfig.EntryFieldSize) + 1 >= crgcConfig.DeltaGraphSize;
+        return shadows.size() >= crgcConfig.MaxDeltaGraphSize;
     }
 
     /**
      * Whether the graph is nonempty, i.e. there is at least one {@link DeltaShadow} in the graph.
      */
     public boolean nonEmpty() {
-        return size > 0;
+        return !shadows.isEmpty();
     }
 
     public void serialize(ObjectOutputStream out) throws IOException {
@@ -188,14 +184,14 @@ public class DeltaGraph implements Serializable {
         out.writeObject(address);
 
         // Serialize the shadows
-        out.writeShort(size);
+        out.writeShort(shadows.size());
         metrics.shadowSize += 2;
-        for (int i = 0; i < size; i++) {
-            metrics.shadowSize += shadows[i].serialize(out);
+        for (DeltaShadow shadow : shadows) {
+            metrics.shadowSize += shadow.serialize(out);
         }
 
         // Serialize the compression table
-        assert(compressionTable.size() == size);
+        assert(compressionTable.size() == shadows.size());
         for (Map.Entry<ActorRef, Short> entry : compressionTable.entrySet()) {
             out.writeShort(entry.getValue());
             out.writeObject(entry.getKey());
@@ -210,11 +206,11 @@ public class DeltaGraph implements Serializable {
         address = (Address) in.readObject();
 
         // Deserialize the shadows
-        size = in.readShort();
-        shadows = new DeltaShadow[size];
+        int size = in.readShort();
+        shadows = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {
-            shadows[i] = new DeltaShadow();
-            shadows[i].deserialize(in);
+            shadows.add(new DeltaShadow());
+            shadows.get(i).deserialize(in);
         }
 
         // Deserialize the compression table; it will have size `size`
@@ -236,13 +232,12 @@ public class DeltaGraph implements Serializable {
         deserialize(in);
     }
 
-    // Implement equality check
     @Override
     public boolean equals(Object obj) {
         if (this == obj) return true;
         if (obj == null || getClass() != obj.getClass()) return false;
         DeltaGraph that = (DeltaGraph) obj;
-        return size == that.size && compressionTable.equals(that.compressionTable) && address.equals(that.address);
+        return this.shadows.size() == that.shadows.size() && compressionTable.equals(that.compressionTable) && address.equals(that.address);
     }
 
 }

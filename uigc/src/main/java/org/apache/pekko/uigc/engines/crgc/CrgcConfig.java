@@ -6,8 +6,7 @@ import com.typesafe.config.Config;
  * A data structure for quickly fetching CRGC-specific configuration options.
  */
 public class CrgcConfig {
-    final public short DeltaGraphSize;
-    final public int EntryFieldSize;
+    final public short MaxDeltaGraphSize;
     final public CRGC.CollectionStyle CollectionStyle;
     final public int numNodes;
     final public int waveFrequency;
@@ -15,8 +14,7 @@ public class CrgcConfig {
     final public int tracingFrequency;
 
     public CrgcConfig(Config config) {
-        DeltaGraphSize = (short) config.getInt("uigc.crgc.delta-graph-size");
-        EntryFieldSize = config.getInt("uigc.crgc.entry-field-size");
+        MaxDeltaGraphSize = (short) config.getInt("uigc.crgc.max-delta-graph-size");
         String _collectionStyle = config.getString("uigc.crgc.collection-style");
         switch (_collectionStyle) {
             case "wave":
