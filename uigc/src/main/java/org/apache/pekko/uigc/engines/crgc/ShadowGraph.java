@@ -1,5 +1,6 @@
 package org.apache.pekko.uigc.engines.crgc;
 
+import org.agrona.collections.Object2IntHashMap;
 import org.apache.pekko.actor.Address;
 import org.apache.pekko.actor.ActorRef;
 import org.apache.pekko.uigc.engines.crgc.jfr.TracingEvent;
@@ -12,12 +13,12 @@ public class ShadowGraph {
     int totalActorsSeen = 0;
     ArrayList<Shadow> from;
     HashMap<ActorRef, Shadow> shadowMap;
-    Context context;
+    CrgcConfig crgcConfig;
 
-    public ShadowGraph(Context context) {
+    public ShadowGraph(CrgcConfig crgcConfig) {
         this.from = new ArrayList<>();
         this.shadowMap = new HashMap<>();
-        this.context = context;
+        this.crgcConfig = crgcConfig;
     }
 
     public Shadow getShadow(RefInfo refob) {
@@ -46,7 +47,6 @@ public class ShadowGraph {
         totalActorsSeen++;
         // Haven't heard of this actor yet. Create a shadow for it.
         Shadow shadow = new Shadow();
-        shadow.location = ref.path().address();
         shadow.self = ref;
         shadow.mark = !MARKED;
             // The value of MARKED flips on every GC scan. Make sure this shadow is unmarked.
@@ -61,8 +61,8 @@ public class ShadowGraph {
         return shadow;
     }
 
-    public void updateOutgoing(Map<Shadow, Integer> outgoing, Shadow target, int delta) {
-        int count = outgoing.getOrDefault(target, 0);
+    public void updateOutgoing(Object2IntHashMap<Shadow> outgoing, Shadow target, int delta) {
+        int count = outgoing.getValue(target);
         if (count + delta == 0) {
             // Instead of writing zero, we delete the count.
             outgoing.remove(target);
@@ -80,45 +80,40 @@ public class ShadowGraph {
         selfShadow.recvCount += entry.recvCount;
         selfShadow.isBusy = entry.isBusy;
         selfShadow.isRoot = entry.isRoot;
-
-        // Created refs.
-        for (int i = 0; i < context.EntryFieldSize; i++) {
-            if (entry.createdOwners[i] == null) break;
-            RefInfo owner = entry.createdOwners[i];
-            Shadow targetShadow = getShadow(entry.createdTargets[i]);
-
-            // Increment the number of outgoing refs to the target
-            Shadow shadow = getShadow(owner);
-            updateOutgoing(shadow.outgoing, targetShadow, 1);
+        if (entry.creator != null) {
+            Shadow creatorShadow = getShadow(entry.creator);
+            selfShadow.supervisor = creatorShadow;
+            updateOutgoing(creatorShadow.outgoing, selfShadow, 1);
         }
 
-        // Spawned actors.
-        for (int i = 0; i < context.EntryFieldSize; i++) {
-            if (entry.spawnedActors[i] == null) break;
-            RefInfo child = entry.spawnedActors[i];
-
-            // Set the child's supervisor field
-            Shadow childShadow = getShadow(child);
-            childShadow.supervisor = selfShadow;
-            // NB: We don't increase the parent's created count; that info is in the child snapshot.
-        }
-
-        // Update refs.
-        for (int i = 0; i < context.EntryFieldSize; i++) {
-            if (entry.updatedRefs[i] == null) break;
-            RefInfo target = entry.updatedRefs[i];
-            Shadow targetShadow = getShadow(target);
-            short info = entry.updatedInfos[i];
-            short sendCount = RefobInfo.count(info);
-            boolean isActive = RefobInfo.isActive(info);
-            boolean isDeactivated = !isActive;
-
-            // Update the owner's outgoing references
-            if (sendCount > 0) {
-                targetShadow.recvCount -= sendCount; // may be negative!
+        // Deactivated refs.
+        if (entry.deactivatedRefs != null) {
+            for (Map.Entry<RefInfo, Integer> deactivationEntry : entry.deactivatedRefs.entrySet()) {
+                RefInfo target = deactivationEntry.getKey();
+                int count = deactivationEntry.getValue(); // How many references to target have been deactivated
+                Shadow targetShadow = getShadow(target);
+                updateOutgoing(selfShadow.outgoing, targetShadow, -count);
             }
-            if (isDeactivated) {
-                updateOutgoing(selfShadow.outgoing, targetShadow, -1);
+        }
+
+        // Updated refs.
+        if (entry.updatedRefobs != null) {
+            for (int i = 0; i < entry.updatedRefobs.size(); i++) {
+                RefInfo updatedRef = entry.updatedRefobs.get(i);
+                int sendCount = entry.sendCounts[i]; // The number of messages that self has sent to updatedRef
+                HashMap<RefInfo, Integer> createdRefs = entry.createdRefobs[i];
+                Shadow updatedShadow = getShadow(updatedRef);
+
+                updatedShadow.recvCount -= sendCount; // may become negative!
+
+                if (createdRefs != null) {
+                    for (Map.Entry<RefInfo, Integer> creationEntry : createdRefs.entrySet()) {
+                        RefInfo targetRef = creationEntry.getKey();
+                        int creationCount = creationEntry.getValue(); // The number of refs sent to updatedRef pointing to targetRef
+                        Shadow targetShadow = getShadow(targetRef);
+                        updateOutgoing(updatedShadow.outgoing, targetShadow, creationCount);
+                    }
+                }
             }
         }
 
@@ -128,8 +123,8 @@ public class ShadowGraph {
         // This array maps compressed IDs to ActorRefs.
         ActorRef[] decoder = delta.decoder();
 
-        for (short i = 0; i < delta.size; i++) {
-            DeltaShadow deltaShadow = delta.shadows[i];
+        for (short i = 0; i < delta.shadows.size(); i++) {
+            DeltaShadow deltaShadow = delta.shadows.get(i);
             Shadow shadow = getShadow(decoder[i]);
 
             shadow.interned = shadow.interned || deltaShadow.interned;
@@ -160,7 +155,7 @@ public class ShadowGraph {
         // 2. All actors have their undelivered message counts adjusted.
         // 3. All actors have their outgoing references adjusted.
         for (Shadow shadow : from) {
-            if (shadow.location.equals(log.nodeAddress)) {
+            if (shadow.self.path().address().equals(log.nodeAddress)) {
                 shadow.isHalted = true;
             }
             UndoLog.Field field = log.admitted.get(shadow.self);
@@ -205,6 +200,7 @@ public class ShadowGraph {
     public void trace(boolean shouldKill) {
         TracingEvent tracingEvent = new TracingEvent();
         tracingEvent.begin();
+        long startTime = System.nanoTime();
 
         //System.out.println("Scanning " + from.size() + " actors...");
         ArrayList<Shadow> to = new ArrayList<>(from.size());
@@ -285,6 +281,7 @@ public class ShadowGraph {
         from = to;
         MARKED = !MARKED;
 
+        tracingEvent.nanosToTrace = System.nanoTime() - startTime;
         tracingEvent.commit();
     }
 
@@ -303,7 +300,7 @@ public class ShadowGraph {
         // Mark everything reachable by `location`.
         ArrayList<Shadow> to = new ArrayList<>();
         for (Shadow shadow : from) {
-            if (shadow.location.equals(location)) {
+            if (shadow.self.path().address().equals(location)) {
                 to.add(shadow);
                 shadow.mark = MARKED;
             }
@@ -332,8 +329,8 @@ public class ShadowGraph {
     public void addressesInGraph() {
         HashMap<Address, Integer> addresses = new HashMap<>();
         for (Shadow shadow : from) {
-            int count = addresses.getOrDefault(shadow.location, 0);
-            addresses.put(shadow.location, count+1);
+            int count = addresses.getOrDefault(shadow.self.path().address(), 0);
+            addresses.put(shadow.self.path().address(), count+1);
         }
         for (Map.Entry<Address, Integer> entry : addresses.entrySet()) {
             System.out.println(entry.getValue() + " uncollected at " + entry.getKey());

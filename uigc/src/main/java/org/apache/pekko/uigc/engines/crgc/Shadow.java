@@ -2,20 +2,19 @@ package org.apache.pekko.uigc.engines.crgc;
 
 import org.apache.pekko.actor.Address;
 import org.apache.pekko.actor.ActorRef;
+import org.agrona.collections.Object2IntHashMap;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
 public class Shadow {
     ActorRef self;
-    Address location;
     /**
      * A collection of actors that this actor may be acquainted with. The value of <tt>outgoing(b)</tt> is the
      * number of references this actor appears to have for <tt>b</tt>. The value may be negative, meaning this
      * actor has deactivated more references than have been created for it.
      */
-    HashMap<Shadow, Integer> outgoing;
+    Object2IntHashMap<Shadow> outgoing;
     /**
      * This actor's parent, if it is known; {@code null} otherwise.
      */
@@ -40,7 +39,7 @@ public class Shadow {
     boolean isHalted;
 
     public Shadow() {
-        this.outgoing = new HashMap<>();
+        this.outgoing = new Object2IntHashMap<>(0);
         this.self = null;
         this.supervisor = null;
         this.recvCount = 0;

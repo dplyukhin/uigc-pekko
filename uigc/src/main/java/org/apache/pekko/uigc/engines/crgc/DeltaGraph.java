@@ -5,6 +5,7 @@ import org.apache.pekko.actor.ActorRef;
 import org.apache.pekko.uigc.engines.crgc.jfr.DeltaGraphSerialization;
 
 import java.io.*;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -30,19 +31,15 @@ public class DeltaGraph implements Serializable {
     /**
      * Delta shadows are stored in this array. An actor's compressed ID is its position in the array.
      */
-    DeltaShadow[] shadows;
+    ArrayList<DeltaShadow> shadows;
     /**
      * The address of the node that produced this graph.
      */
     Address address;
     /**
-     * The number of delta shadows in this graph.
-     */
-    short size;
-    /**
      * CRGC Configuration options.
      */
-    Context context;
+    CrgcConfig crgcConfig;
 
     /**
      * FOR INTERNAL USE ONLY! The serializer wants a public empty constructor.
@@ -57,13 +54,12 @@ public class DeltaGraph implements Serializable {
      *
      * @param address the address of the ActorSystem that created this graph
      */
-    public static DeltaGraph initialize(Address address, Context context) {
+    public static DeltaGraph initialize(Address address, CrgcConfig crgcConfig) {
         DeltaGraph graph = new DeltaGraph();
-        graph.compressionTable = new HashMap<>(context.DeltaGraphSize);
-        graph.shadows = new DeltaShadow[context.DeltaGraphSize];
-        graph.size = 0;
+        graph.compressionTable = new HashMap<>();
+        graph.shadows = new ArrayList<>();
         graph.address = address;
-        graph.context = context;
+        graph.crgcConfig = crgcConfig;
         return graph;
     }
 
@@ -73,53 +69,48 @@ public class DeltaGraph implements Serializable {
     public void mergeEntry(Entry entry) {
         // Local information.
         short selfID = encode(entry.self);
-        DeltaShadow selfShadow = shadows[selfID];
+        DeltaShadow selfShadow = shadows.get(selfID);
         selfShadow.interned = true;
         selfShadow.recvCount += entry.recvCount;
         selfShadow.isBusy = entry.isBusy;
         selfShadow.isRoot = entry.isRoot;
 
-        // Created refs.
-        for (int i = 0; i < context.EntryFieldSize; i++) {
-            if (entry.createdOwners[i] == null) break;
-            RefInfo owner = entry.createdOwners[i];
-            short targetID = encode(entry.createdTargets[i]);
-
-            // Increment the number of outgoing refs to the target
-            short ownerID = encode(owner);
-            DeltaShadow ownerShadow = shadows[ownerID];
-            updateOutgoing(ownerShadow.outgoing, targetID, 1);
+        if (entry.creator != null) {
+            short creatorID = encode(entry.creator);
+            DeltaShadow creatorShadow = shadows.get(creatorID);
+            selfShadow.supervisor = creatorID;
+            updateOutgoing(creatorShadow.outgoing, selfID, 1);
         }
 
-        // Spawned actors.
-        for (int i = 0; i < context.EntryFieldSize; i++) {
-            if (entry.spawnedActors[i] == null) break;
-            RefInfo child = entry.spawnedActors[i];
-
-            // Set the child's supervisor field
-            short childID = encode(child);
-            DeltaShadow childShadow = shadows[childID];
-            childShadow.supervisor = selfID;
-            // NB: We don't increase the parent's created count; that info is in the child snapshot.
-        }
-
-        // Deactivate refs.
-        for (int i = 0; i < context.EntryFieldSize; i++) {
-            if (entry.updatedRefs[i] == null) break;
-            short info = entry.updatedInfos[i];
-            RefInfo target = entry.updatedRefs[i];
-            short targetID = encode(target);
-            short sendCount = RefobInfo.count(info);
-            boolean isActive = RefobInfo.isActive(info);
-            boolean isDeactivated = !isActive;
-
-            // Update the owner's outgoing references
-            if (sendCount > 0) {
-                DeltaShadow targetShadow = shadows[targetID];
-                targetShadow.recvCount -= sendCount; // may be negative!
+        // Deactivated refs.
+        if (entry.deactivatedRefs != null) {
+            for (Map.Entry<RefInfo, Integer> deactivationEntry : entry.deactivatedRefs.entrySet()) {
+                RefInfo target = deactivationEntry.getKey();
+                short targetID = encode(target);
+                int count = deactivationEntry.getValue(); // How many references to target have been deactivated
+                updateOutgoing(selfShadow.outgoing, targetID, -count);
             }
-            if (isDeactivated) {
-                updateOutgoing(selfShadow.outgoing, targetID, -1);
+        }
+
+        // Updated refs.
+        if (entry.updatedRefobs != null) {
+            for (int i = 0; i < entry.updatedRefobs.size(); i++) {
+                RefInfo updatedRef = entry.updatedRefobs.get(i);
+                short updatedID = encode(updatedRef);
+                int sendCount = entry.sendCounts[i]; // The number of messages that self has sent to updatedRef
+                HashMap<RefInfo, Integer> createdRefs = entry.createdRefobs[i];
+                DeltaShadow updatedShadow = shadows.get(updatedID);
+
+                updatedShadow.recvCount -= sendCount; // may become negative!
+
+                if (createdRefs != null) {
+                    for (Map.Entry<RefInfo, Integer> creationEntry : createdRefs.entrySet()) {
+                        RefInfo targetRef = creationEntry.getKey();
+                        short targetID = encode(targetRef);
+                        int creationCount = creationEntry.getValue(); // The number of refs sent to updatedRef pointing to targetRef
+                        updateOutgoing(updatedShadow.outgoing, targetID, creationCount);
+                    }
+                }
             }
         }
     }
@@ -149,10 +140,10 @@ public class DeltaGraph implements Serializable {
         if (compressionTable.containsKey(ref))
             return compressionTable.get(ref);
 
-        short id = size++;
-        compressionTable.put(ref, id);
-        shadows[id] = new DeltaShadow();
-        return id;
+        int id = shadows.size();
+        compressionTable.put(ref, (short) id);
+        shadows.add(new DeltaShadow());
+        return (short) id;
     }
 
     /**
@@ -161,7 +152,7 @@ public class DeltaGraph implements Serializable {
      */
     public ActorRef[] decoder() {
         // This will act as a hashmap, mapping compressed IDs to actorRefs.
-        ActorRef[] refs = new ActorRef[this.size];
+        ActorRef[] refs = new ActorRef[this.shadows.size()];
         for (Map.Entry<ActorRef, Short> entry : this.compressionTable.entrySet()) {
             refs[entry.getValue()] = entry.getKey();
         }
@@ -176,14 +167,14 @@ public class DeltaGraph implements Serializable {
          * so many new shadows. So we never fill the delta graph to actual capacity; we
          * tell the GC to finalize the delta graph if the next entry *could potentially*
          * cause an overflow. */
-        return size + (4 * context.EntryFieldSize) + 1 >= context.DeltaGraphSize;
+        return shadows.size() >= crgcConfig.MaxDeltaGraphSize;
     }
 
     /**
      * Whether the graph is nonempty, i.e. there is at least one {@link DeltaShadow} in the graph.
      */
     public boolean nonEmpty() {
-        return size > 0;
+        return !shadows.isEmpty();
     }
 
     public void serialize(ObjectOutputStream out) throws IOException {
@@ -193,14 +184,14 @@ public class DeltaGraph implements Serializable {
         out.writeObject(address);
 
         // Serialize the shadows
-        out.writeShort(size);
+        out.writeShort(shadows.size());
         metrics.shadowSize += 2;
-        for (int i = 0; i < size; i++) {
-            metrics.shadowSize += shadows[i].serialize(out);
+        for (DeltaShadow shadow : shadows) {
+            metrics.shadowSize += shadow.serialize(out);
         }
 
         // Serialize the compression table
-        assert(compressionTable.size() == size);
+        assert(compressionTable.size() == shadows.size());
         for (Map.Entry<ActorRef, Short> entry : compressionTable.entrySet()) {
             out.writeShort(entry.getValue());
             out.writeObject(entry.getKey());
@@ -215,11 +206,11 @@ public class DeltaGraph implements Serializable {
         address = (Address) in.readObject();
 
         // Deserialize the shadows
-        size = in.readShort();
-        shadows = new DeltaShadow[size];
+        int size = in.readShort();
+        shadows = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {
-            shadows[i] = new DeltaShadow();
-            shadows[i].deserialize(in);
+            shadows.add(new DeltaShadow());
+            shadows.get(i).deserialize(in);
         }
 
         // Deserialize the compression table; it will have size `size`
@@ -241,13 +232,12 @@ public class DeltaGraph implements Serializable {
         deserialize(in);
     }
 
-    // Implement equality check
     @Override
     public boolean equals(Object obj) {
         if (this == obj) return true;
         if (obj == null || getClass() != obj.getClass()) return false;
         DeltaGraph that = (DeltaGraph) obj;
-        return size == that.size && compressionTable.equals(that.compressionTable) && address.equals(that.address);
+        return this.shadows.size() == that.shadows.size() && compressionTable.equals(that.compressionTable) && address.equals(that.address);
     }
 
 }

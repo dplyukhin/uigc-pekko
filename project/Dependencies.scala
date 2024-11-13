@@ -235,7 +235,8 @@ object Dependencies {
 
   val testkit = l ++= Seq(TestDependencies.junit, TestDependencies.scalatest) ++ TestDependencies.metricsAll
 
-  val uigcTests = l ++= Seq(
+  val uigc = l ++= Seq(
+    agrona,
     TestDependencies.scalacheck,
     Compile.logback
   )

@@ -20,32 +20,42 @@ class RefInfo(
 
   override def ref: ActorRef = target
 
-  private var _hasBeenRecorded: Boolean = false
-  private var _info: Short = RefobInfo.activeRefob
+  private var _createdRefs: java.util.HashMap[RefInfo, Int] = new java.util.HashMap()
+  private var _sendCount: Int = 0
+  private var _hasBeenUpdated: Boolean = false
 
-  def info: Short = _info
+  def sendCount: Int = _sendCount
 
-  def hasBeenRecorded: Boolean = _hasBeenRecorded
+  def canIncSendCount: Boolean =
+    _sendCount < Int.MaxValue
 
-  def setHasBeenRecorded(): Unit = {
-    _hasBeenRecorded = true
+  /** Returns whether the refinfo needs to be added to the state */
+  def incSendCount(): Boolean = {
+    val old = _hasBeenUpdated
+    _hasBeenUpdated = true
+    _sendCount += 1
+    !old
   }
 
-  def deactivate(): Unit = {
-    _info = RefobInfo.deactivate(_info)
-  }
+  /** `createdRefs(a)` is the number of references to `a` that have been sent to this actor. */
+  def createdRefs: java.util.HashMap[RefInfo, Int] = _createdRefs
 
-  def incSendCount(): Unit = {
-    _info = RefobInfo.incSendCount(_info)
-  }
-
-  def canIncSendCount: Boolean = {
-    RefobInfo.canIncrement(_info)
+  /** Returns whether the refinfo needs to be added to the state */
+  def addCreatedRefPointingTo(target: RefInfo): Boolean = {
+    val old = _hasBeenUpdated
+    _hasBeenUpdated = true
+    if (_createdRefs == null) {
+      _createdRefs = new java.util.HashMap(4)
+    }
+    val count = _createdRefs.getOrDefault(target, 0)
+    _createdRefs.put(target, count + 1)
+    !old
   }
 
   def reset(): Unit = {
-    _info = RefobInfo.resetCount(_info)
-    _hasBeenRecorded = false
+    _hasBeenUpdated = false
+    _sendCount = 0
+    _createdRefs = null
   }
 
   override def equals(that: Any): Boolean =

@@ -39,7 +39,12 @@ object LocalGC {
   /** Message produced by a timer, asking the garbage collector to scan its queue of incoming
     * entries.
     */
-  private case object Wakeup extends Msg
+  private case object ProcessEntries extends Msg
+
+  /** Message produced by a timer, asking the garbage collector to search the shadow graph
+   * for garbage.
+   */
+  private case object TraceGraph extends Msg
 
   /** Message produced by a timer, asking the garbage collector to start a wave. */
   private case object StartWave extends Msg
@@ -50,12 +55,9 @@ class LocalGC extends Actor with Timers {
 
   private val engine = UIGC(context.system).asInstanceOf[CRGC]
 
-  private val numNodes = engine.config.getInt("uigc.crgc.num-nodes")
-  private val waveFrequency: Int = engine.config.getInt("uigc.crgc.wave-frequency")
-
   private val thisAddress: Address =
-    if (numNodes > 1) Cluster(context.system).selfMember.address else null
-  private val shadowGraph = new ShadowGraph(engine.crgcContext)
+    if (engine.crgcConfig.numNodes > 1) Cluster(context.system).selfMember.address else null
+  private val shadowGraph = new ShadowGraph(engine.crgcConfig)
   private var remoteGCs: Map[Address, ActorSelection] = Map()
   private var undoLogs: Map[Address, UndoLog] = Map()
   private var downedGCs: Set[Address] = Set()
@@ -64,12 +66,13 @@ class LocalGC extends Actor with Timers {
   private var totalEntries: Int = 0
   // private val testGraph = new ShadowGraph()
   private var deltaGraphID: Int = 0
-  private var deltaGraph = DeltaGraph.initialize(thisAddress, engine.crgcContext)
+  private var deltaGraph = DeltaGraph.initialize(thisAddress, engine.crgcConfig)
+
 
   // Statistics
   private var wakeupCount = 0
 
-  if (numNodes == 1) {
+  if (engine.crgcConfig.numNodes == 1) {
     start()
   } else {
     Cluster(context.system).subscribe(self, classOf[MemberUp])
@@ -144,51 +147,50 @@ class LocalGC extends Actor with Timers {
     // }
     // shadowGraph.assertEquals(testGraph)
 
-    case Wakeup =>
+    case TraceGraph =>
+      shadowGraph.trace(true)
+
+    case ProcessEntries =>
       wakeupCount += 1
       // println("Bookkeeper woke up!")
       val entryProcessingStats = new ProcessingEntries()
       entryProcessingStats.begin()
 
-      val queue = engine.Queue
+      entryProcessingStats.nanosToProcess = System.nanoTime()
       var count = 0
       var deltaCount = 0
-      var entry: Entry = queue.poll()
-      while (entry != null) {
-        count += 1
-        shadowGraph.mergeEntry(entry)
-        // testGraph.mergeEntry(entry)
-        // shadowGraph.assertEquals(testGraph)
+      for (queue <- CRGC.EntryQueues) {
+        var entry: Entry = queue.poll()
+        while (entry != null) {
+          count += 1
+          shadowGraph.mergeEntry(entry)
+          // testGraph.mergeEntry(entry)
+          // shadowGraph.assertEquals(testGraph)
 
-        if (numNodes > 1) {
-          deltaGraph.mergeEntry(entry)
-          if (deltaGraph.isFull) {
-            deltaCount += 1
-            finalizeDeltaGraph()
+          if (engine.crgcConfig.numNodes > 1) {
+            deltaGraph.mergeEntry(entry)
+            if (deltaGraph.isFull) {
+              deltaCount += 1
+              finalizeDeltaGraph()
+            }
           }
+
+          // Try and get another one
+          entry = queue.poll()
         }
-
-        // Put back the entry
-        entry.clean()
-        CRGC.EntryPool.add(entry)
-        // Try and get another one
-        entry = queue.poll()
+        // Done processing entries in this queue. Try the next queue.
       }
-
-      if (numNodes > 1 && deltaGraph.nonEmpty()) {
-        deltaCount += 1
-        finalizeDeltaGraph()
-      }
-
       entryProcessingStats.numEntries = count
-      entryProcessingStats.commit()
+      entryProcessingStats.nanosToProcess = System.nanoTime() - entryProcessingStats.nanosToProcess
 
       totalEntries += count
 
-      shadowGraph.trace(true)
       //if (wakeupCount % 100 == 0)
       //  shadowGraph.investigateLiveSet()
       // shadowGraph.assertEquals(testGraph)
+
+      //println(s"Bookkeeper processed $count entries in ${entryProcessingStats.nanosToProcess/1000} microseconds")
+      entryProcessingStats.commit()
 
     case StartWave =>
       shadowGraph.startWave()
@@ -198,7 +200,7 @@ class LocalGC extends Actor with Timers {
     for (gc <- remoteGCs.values)
       gc ! DeltaMsg(deltaGraphID, deltaGraph, context.self)
     deltaGraphID += 1
-    deltaGraph = DeltaGraph.initialize(thisAddress, engine.crgcContext)
+    deltaGraph = DeltaGraph.initialize(thisAddress, engine.crgcConfig)
   }
 
   private def addMember(member: Member): Unit =
@@ -209,17 +211,18 @@ class LocalGC extends Actor with Timers {
       remoteGCs = remoteGCs + (addr -> gc)
       if (!undoLogs.contains(addr))
         undoLogs = undoLogs + (addr -> new UndoLog(addr))
-      if (remoteGCs.size + 1 == numNodes) {
+      if (remoteGCs.size + 1 == engine.crgcConfig.numNodes) {
         start()
       }
     }
 
   private def start(): Unit = {
     // Start processing entries
-    timers.startTimerWithFixedDelay(Wakeup, Wakeup, 50.millis)
+    timers.startTimerWithFixedDelay(ProcessEntries, ProcessEntries, engine.crgcConfig.entryProcessingFrequency.millis)
+    timers.startTimerWithFixedDelay(TraceGraph, TraceGraph, engine.crgcConfig.tracingFrequency.millis)
     // Start triggering GC waves
-    if (engine.collectionStyle == CRGC.Wave) {
-      timers.startTimerWithFixedDelay(StartWave, StartWave, waveFrequency.millis)
+    if (engine.crgcConfig.CollectionStyle == CRGC.Wave) {
+      timers.startTimerWithFixedDelay(StartWave, StartWave, engine.crgcConfig.waveFrequency.millis)
     }
     // Start asking egress actors to finalize entries
     for ((addr, _) <- remoteGCs)
@@ -283,6 +286,7 @@ class LocalGC extends Actor with Timers {
       println(s"Address $addr is preventing $count actors from being collected.")
     }
     // shadowGraph.investigateLiveSet()
-    timers.cancel(Wakeup)
+    timers.cancel(ProcessEntries)
+    timers.cancel(TraceGraph)
   }
 }

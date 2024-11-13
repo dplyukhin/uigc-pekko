@@ -135,7 +135,7 @@ lazy val uigc = pekkoModule("uigc")
     cluster % "compile->compile",
     actorTestkitTyped % "compile->test",
   )
-  .settings(Dependencies.uigcTests)
+  .settings(Dependencies.uigc)
   .settings(Test / parallelExecution := false)
 
 lazy val actorTests = pekkoModule("actor-tests")

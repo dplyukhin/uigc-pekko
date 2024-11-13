@@ -14,4 +14,7 @@ public class TracingEvent extends Event {
     @Label("Number of Live Actors Remaining")
     public int numLiveActors;
 
+    @Label("Time to Trace (ns)")
+    public long nanosToTrace;
+
 }

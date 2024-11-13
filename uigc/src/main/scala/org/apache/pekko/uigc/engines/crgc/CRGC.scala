@@ -6,15 +6,21 @@ import org.apache.pekko.remote.artery.{InboundEnvelope, ObjectPool, OutboundEnve
 import org.apache.pekko.stream.stage.GraphStageLogic
 import org.apache.pekko.stream.{FlowShape, Inlet, Outlet}
 import com.typesafe.config.Config
-import org.apache.pekko.uigc.engines.crgc.jfr.EntrySendEvent
 import org.apache.pekko.uigc.engines.{Engine, crgc}
 import org.apache.pekko.uigc.{interfaces => uigc}
 
 import java.util.concurrent.ConcurrentLinkedQueue
 
 object CRGC {
+  val NUM_ENTRY_QUEUES = 16
 
-  val EntryPool: ConcurrentLinkedQueue[Entry] = new ConcurrentLinkedQueue[Entry]()
+  /** The queue of entries sent to the local GC */
+  val EntryQueues: Array[ConcurrentLinkedQueue[Entry]] = Array.fill(NUM_ENTRY_QUEUES)(new ConcurrentLinkedQueue[Entry]())
+
+  def getEntryQueue(ref: actor.ActorRef): ConcurrentLinkedQueue[Entry] = {
+    val idx = Math.abs(ref.hashCode % EntryQueues.length)
+    EntryQueues(idx)
+  }
 
   trait CollectionStyle
 
@@ -24,9 +30,7 @@ object CRGC {
 
   case object Wave extends CollectionStyle
 
-  private case object OnBlock extends CollectionStyle
-
-  private case object OnIdle extends CollectionStyle
+  case object OnBlock extends CollectionStyle
 
 }
 
@@ -39,16 +43,7 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
   override type StateImpl = crgc.State
 
   val config: Config = system.settings.config
-  val collectionStyle: CollectionStyle =
-    config.getString("uigc.crgc.collection-style") match {
-      case "wave"     => Wave
-      case "on-block" => OnBlock
-      case "on-idle"  => OnIdle
-    }
-  val crgcContext = new Context(config)
-
-  // This could be split into multiple queues if contention becomes high
-  val Queue: ConcurrentLinkedQueue[Entry] = new ConcurrentLinkedQueue[Entry]()
+  val crgcConfig = new CrgcConfig(config)
 
   val bookkeeper: org.apache.pekko.actor.ActorRef =
     system.systemActorOf(
@@ -67,23 +62,32 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
       spawnInfo: SpawnInfo
   ): State = {
     val self = context.self
+
     val selfRefob = new RefInfo(self, targetShadow = null)
-    val state = new State(selfRefob, crgcContext)
-    state.recordNewRefob(selfRefob, selfRefob)
+    val state = new State(selfRefob, crgcConfig)
+
+    // NB: We don't need to bother recording references from an actor
+    // to itself because it doesn't change which actors will be garbage
+    // in the shadow graph.
+
     spawnInfo.creator match {
       case Some(creator) =>
-        state.recordNewRefob(creator, selfRefob)
+        state.setCreator(creator)
       case None =>
         state.markAsRoot()
     }
 
-    def onBlock(): Unit =
-      sendEntry(state, isBusy=false)
+    def onBlock(): Unit = {
+      if (state.hasChanged)
+        sendEntry(state, isBusy=false, reason=State.BLOCKED)
+    }
 
-    if (collectionStyle == OnBlock)
+    if (crgcConfig.CollectionStyle == OnBlock)
       context.queue.onFinishedProcessingHook = onBlock
-    if ((collectionStyle == Wave && state.isRoot) || collectionStyle == OnIdle)
-      sendEntry(state, isBusy=false)
+
+    if (crgcConfig.CollectionStyle == Wave && state.isRoot)
+      sendEntry(state, isBusy=false, reason=State.WAVE)
+
     state
   }
 
@@ -100,10 +104,7 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
   ): RefInfo = {
     val child = factory(new SpawnInfo(Some(state.self)))
     val ref = new RefInfo(child, null)
-    // NB: "onCreate" is only updated at the child, not the parent.
-    if (!state.canRecordNewActor)
-      sendEntry(state, isBusy=true)
-    state.recordNewActor(ref)
+    // NB: We don't record the created ref here; the child does it in [[initStateImpl]].
     ref
   }
 
@@ -115,7 +116,7 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
     msg match {
       case AppMsg(payload, _) =>
         if (!state.canRecordMessageReceived)
-          sendEntry(state, isBusy=true)
+          sendEntry(state, isBusy=true, reason=State.RECV_COUNT_FULL)
         state.recordMessageReceived()
         Some(payload)
       case _ =>
@@ -131,7 +132,8 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
       case StopMsg =>
         Engine.ShouldStop
       case WaveMsg =>
-        sendEntry(state, isBusy=false)
+        if (state.hasChanged)
+          sendEntry(state, isBusy=false, reason=State.WAVE)
         val it = ctx.children.iterator
         while (it.hasNext) {
           val child = it.next()
@@ -139,8 +141,6 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
         }
         Engine.ShouldContinue
       case _ =>
-        if (collectionStyle == OnIdle)
-          sendEntry(state, isBusy=false)
         Engine.ShouldContinue
     }
 
@@ -151,9 +151,10 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
                               ctx: actor.ActorContext
   ): RefInfo = {
     val ref = new RefInfo(target.target, target.targetShadow)
-    if (!state.canRecordNewRefob)
-      sendEntry(state, isBusy=true)
-    state.recordNewRefob(owner, target)
+    val shouldBeRecorded = owner.addCreatedRefPointingTo(target)
+    if (shouldBeRecorded) {
+      state.recordUpdatedRefob(owner)
+    }
     ref
   }
 
@@ -162,26 +163,17 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
                                state: State,
                                ctx: actor.ActorContext
   ): Unit = {
-    if (!state.canRecordUpdatedRefob(ref))
-      sendEntry(state, isBusy=true)
-    ref.deactivate()
-    state.recordUpdatedRefob(ref)
+    state.recordDeactivatedRefob(ref)
   }
 
   private def sendEntry(
       state: State,
-      isBusy: Boolean
+      isBusy: Boolean,
+      reason: Int
   ): Unit = {
-    val metrics = new EntrySendEvent()
-    metrics.begin()
-    var entry = CRGC.EntryPool.poll()
-    if (entry == null) {
-      entry = new Entry(crgcContext)
-      metrics.allocatedMemory = true
-    }
-    state.flushToEntry(isBusy, entry)
-    Queue.add(entry)
-    metrics.commit()
+    val entry = new Entry()
+    state.flushToEntry(isBusy, entry, reason)
+    getEntryQueue(state.self.ref).add(entry)
   }
 
   override def preSignalImpl(
@@ -204,10 +196,12 @@ class CRGC(system: ExtendedActorSystem) extends Engine {
                                 state: State,
                                 ctx: actor.ActorContext
   ): Unit = {
-    if (!ref.canIncSendCount || !state.canRecordUpdatedRefob(ref))
-      sendEntry(state, isBusy=true)
-    ref.incSendCount()
-    state.recordUpdatedRefob(ref)
+    if (!ref.canIncSendCount)
+      sendEntry(state, isBusy=true, reason=State.SEND_COUNT_FULL)
+
+    val shouldBeRecorded = ref.incSendCount()
+    if (shouldBeRecorded)
+      state.recordUpdatedRefob(ref)
 
     ref.target ! AppMsg(msg, refs)
   }

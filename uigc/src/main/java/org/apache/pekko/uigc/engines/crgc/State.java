@@ -2,123 +2,115 @@ package org.apache.pekko.uigc.engines.crgc;
 
 import org.apache.pekko.uigc.engines.crgc.jfr.EntryFlushEvent;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+
 public class State implements org.apache.pekko.uigc.interfaces.State {
 
-    /** This actor's ref to itself */
     RefInfo self;
-    /** Tracks references created by this actor */
-    RefInfo[] createdOwners;
-    RefInfo[] createdTargets;
-    /** Tracks actors spawned by this actor */
-    RefInfo[] spawnedActors;
+    RefInfo creator;
     /** Tracks all the refobs that have been updated in this entry period */
-    RefInfo[] updatedRefobs;
-    /** Where in the array to insert the next "created" ref */
-    int createdIdx;
-    /** Where in the array to insert the next "spawned" ref */
-    int spawnedIdx;
-    /** Where in the array to insert the next "updated" refob */
-    int updatedIdx;
-    /** Tracks how many messages are received using each reference. */
-    short recvCount;
+    ArrayList<RefInfo> updatedRefobs;
+    /** Tracks how many references to the target actor have been deactivated */
+    HashMap<RefInfo, Integer> deactivatedRefs;
+    /** Tracks how many messages this actor has received since the last entry */
+    int recvCount;
+    /** True iff the actor has anything to report in its next entry */
+    boolean hasChanged;
     /** True iff the actor is a root (i.e. manually collected) */
     boolean isRoot;
     /** True if the GC has asked this actor to stop */
     boolean stopRequested;
-    Context context;
+    CrgcConfig crgcConfig;
 
-    public State(RefInfo self, Context context) {
+    public static int SEND_COUNT_FULL = 1;
+    public static int RECV_COUNT_FULL = 3;
+    public static int BLOCKED = 4;
+    public static int WAVE = 5;
+
+    public State(RefInfo self, CrgcConfig crgcConfig) {
         this.self = self;
-        this.context = context;
-        this.createdOwners = new RefInfo[context.EntryFieldSize];
-        this.createdTargets = new RefInfo[context.EntryFieldSize];
-        this.spawnedActors = new RefInfo[context.EntryFieldSize];
-        this.updatedRefobs = new RefInfo[context.EntryFieldSize];
-        this.createdIdx = 0;
-        this.spawnedIdx = 0;
-        this.updatedIdx = 0;
-        this.recvCount = (short) 0;
+        this.crgcConfig = crgcConfig;
+        this.updatedRefobs = null;
+        this.deactivatedRefs = null;
+        this.recvCount = 0;
+        this.hasChanged = false;
         this.isRoot = false;
         this.stopRequested = false;
     }
 
     public void markAsRoot() {
+        if (!this.isRoot) {
+            this.hasChanged = true;
+        }
         this.isRoot = true;
     }
 
-    public boolean canRecordNewRefob() {
-        return createdIdx < context.EntryFieldSize;
-    }
-
-    public void recordNewRefob(RefInfo owner, RefInfo target) {
-        assert(canRecordNewRefob());
-        int i = createdIdx++;
-        createdOwners[i] = owner;
-        createdTargets[i] = target;
-    }
-
-    public boolean canRecordNewActor() {
-        return spawnedIdx < context.EntryFieldSize;
-    }
-
-    public void recordNewActor(RefInfo child) {
-        assert(canRecordNewActor());
-        spawnedActors[spawnedIdx++] = child;
-    }
-
-    public boolean canRecordUpdatedRefob(RefInfo refob) {
-        return refob.hasBeenRecorded() || updatedIdx < context.EntryFieldSize;
-    }
-
-    public void recordUpdatedRefob(RefInfo refob) {
-        assert(canRecordUpdatedRefob(refob));
-        if (refob.hasBeenRecorded())
-            return;
-        refob.setHasBeenRecorded();
-        updatedRefobs[updatedIdx++] = refob;
-    }
-
     public boolean canRecordMessageReceived() {
-        return recvCount < Short.MAX_VALUE;
+        return recvCount < Integer.MAX_VALUE;
     }
 
     public void recordMessageReceived() {
-        assert(canRecordMessageReceived());
+        this.hasChanged = true;
         recvCount++;
     }
 
-    public void flushToEntry(boolean isBusy, Entry entry) {
+    public void recordUpdatedRefob(RefInfo refob) {
+        this.hasChanged = true;
+        if (updatedRefobs == null) {
+            updatedRefobs = new ArrayList<>(4);
+        }
+        updatedRefobs.add(refob);
+    }
+
+    public void recordDeactivatedRefob(RefInfo refob) {
+        this.hasChanged = true;
+        if (deactivatedRefs == null) {
+            deactivatedRefs = new HashMap<>();
+        }
+        int count = deactivatedRefs.getOrDefault(refob, 0);
+        deactivatedRefs.put(refob, count + 1);
+    }
+
+    public void setCreator(RefInfo creator) {
+        this.hasChanged = true;
+        this.creator = creator;
+    }
+
+    public void flushToEntry(boolean isBusy, Entry entry, int reason) {
         EntryFlushEvent metrics = new EntryFlushEvent();
         metrics.recvCount = recvCount;
+        //System.out.println(self.ref() + " flushing because " + reason);
 
+        // Set basic fields
         entry.self = self;
+        entry.creator = creator;
         entry.isBusy = isBusy;
         entry.isRoot = isRoot;
-
-        for (int i = 0; i < createdIdx; i++) {
-            entry.createdOwners[i] = this.createdOwners[i];
-            entry.createdTargets[i] = this.createdTargets[i];
-            this.createdOwners[i] = null;
-            this.createdTargets[i] = null;
-        }
-        createdIdx = 0;
-
-        for (int i = 0; i < spawnedIdx; i++) {
-            entry.spawnedActors[i] = this.spawnedActors[i];
-            this.spawnedActors[i] = null;
-        }
-        spawnedIdx = 0;
-
         entry.recvCount = recvCount;
-        recvCount = (short) 0;
+        entry.updatedRefobs = updatedRefobs;
+        entry.deactivatedRefs = deactivatedRefs;
 
-        for (int i = 0; i < updatedIdx; i++) {
-            entry.updatedRefs[i] = this.updatedRefobs[i];
-            entry.updatedInfos[i] = this.updatedRefobs[i].info();
-            this.updatedRefobs[i].reset();
-            this.updatedRefobs[i] = null;
+        // Set the send counts
+        if (updatedRefobs != null) {
+            entry.sendCounts = new int[updatedRefobs.size()];
+            entry.createdRefobs = new HashMap[entry.sendCounts.length];
+
+            int i = 0;
+            for (RefInfo refInfo : updatedRefobs) {
+                entry.sendCounts[i] = refInfo.sendCount();
+                entry.createdRefobs[i] = refInfo.createdRefs();
+                refInfo.reset();
+                i++;
+            }
         }
-        updatedIdx = 0;
+
+        // Reset stuff
+        this.creator = null;
+        this.updatedRefobs = null;
+        this.deactivatedRefs = null;
+        this.recvCount = 0;
+        this.hasChanged = false;
 
         metrics.commit();
     }
