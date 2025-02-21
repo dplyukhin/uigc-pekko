@@ -234,11 +234,29 @@ class MAC(system: ExtendedActorSystem) extends Engine {
       ctx: actor.ActorContext
   ): Engine.TerminationDecision =
     if (
-      state.kind == NonRoot && state.rc == 0 && state.pendingSelfMessages == 0 && ctx.children.isEmpty
-    )
-      Engine.ShouldStop
-    else
+      state.kind == NonRoot && state.rc == 0 && state.pendingSelfMessages == 0
+    ) {
+      // At this point, we know the actor is quiescent, so it's safe to deactivate all references.
+      // But if the actor has children, we can't actually stop it yet; stopping an actor causes children
+      // to stop, and some of those children might not be garbage.
+      deactivateAll(state, ctx)
+      if (ctx.children.isEmpty)
+        Engine.ShouldStop
+      else {
+        Engine.ShouldContinue
+      }
+    } else {
       Engine.ShouldContinue
+    }
+
+  private def deactivateAll(state: State, ctx: actor.ActorContext): Unit = {
+    for ((target, pair) <- state.actorMap) {
+      if (target != ctx.self) {
+        target ! DecMsg(pair.weight)
+      }
+    }
+    state.actorMap.clear()
+  }
 
   override def createRefImpl(
                               target: RefInfo,
