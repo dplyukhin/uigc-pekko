@@ -6,6 +6,7 @@ import org.apache.pekko.cluster.{Cluster, Member, MemberStatus}
 import org.apache.pekko.uigc.UIGC
 import org.apache.pekko.uigc.engines.crgc.jfr.{MergingDeltaGraphs, MergingIngressEntries, ProcessingEntries}
 
+import java.lang.management.ManagementFactory
 import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.IterableHasAsJava
 
@@ -71,6 +72,9 @@ class LocalGC extends Actor with Timers {
 
   // Statistics
   private var wakeupCount = 0
+  private val threadMXBean = ManagementFactory.getThreadMXBean
+  if (threadMXBean.isThreadCpuTimeSupported)
+    threadMXBean.setThreadCpuTimeEnabled(true)
 
   if (engine.crgcConfig.numNodes == 1) {
     start()
@@ -277,10 +281,23 @@ class LocalGC extends Actor with Timers {
   }
 
   override def postStop(): Unit = {
+    // Tally up CPU times
+    var totalCpuTime: Long = 0
+    for (id <- threadMXBean.getAllThreadIds) {
+      totalCpuTime += threadMXBean.getThreadCpuTime(id)
+    }
+    val bookkeeperCpuTime = threadMXBean.getThreadCpuTime(Thread.currentThread.getId)
+    val percentCpuOverhead = bookkeeperCpuTime.toDouble / totalCpuTime * 100
+    val percentCpuOverheadRounded = BigDecimal(percentCpuOverhead).setScale(2, BigDecimal.RoundingMode.HALF_UP).toString
+
     println(
-      s"Bookkeeper stopped! Read $totalEntries entries, produced $deltaGraphID delta-graphs, " +
-        s"and discovered ${shadowGraph.totalActorsSeen} actors."
+      s"Bookkeeper stopped. Statistics:\n" +
+        s"Number of entries read: $totalEntries\n" +
+        s"Number of delta graphs produced: $deltaGraphID\n" +
+        s"Number of actors discovered: ${shadowGraph.totalActorsSeen}\n" +
+        s"Total bookkeeper CPU time: ${bookkeeperCpuTime / 1_000_000}ms ($percentCpuOverheadRounded % of all cycles)"
     )
+
     for (addr <- downedGCs) {
       val count = shadowGraph.investigateRemotelyHeldActors(addr)
       println(s"Address $addr is preventing $count actors from being collected.")
