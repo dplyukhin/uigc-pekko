@@ -1,17 +1,17 @@
-package org.apache.pekko.uigc.engines.mac
+package org.apache.pekko.uigc.engines.wrc
 
 import org.apache.pekko.actor
 import org.apache.pekko.actor.ExtendedActorSystem
 import com.typesafe.config.Config
 import org.apache.pekko.actor.typed
 import org.apache.pekko.uigc.engines.Engine
-import org.apache.pekko.uigc.engines.mac.jfr.ActorBlockedEvent
+import org.apache.pekko.uigc.engines.wrc.jfr.ActorBlockedEvent
 import org.apache.pekko.uigc.{interfaces => uigc}
 
 import java.util.concurrent.ConcurrentLinkedQueue
 import scala.collection.mutable
 
-object MAC {
+object WRC {
   type Name = actor.ActorRef
 
   private val RC_INC: Long = 255
@@ -34,15 +34,6 @@ object MAC {
   }
 
   private case object IncMsg extends GCMessage[Nothing] {
-    override def refs: Iterable[RefInfo] = Nil
-  }
-
-  /**
-   * If the cycle detector perceives an actor to be in a cycle, the cycle detector sends
-   * the actor this message.
-   * @param token a unique identifier for the cycle perceived by the cycle detector
-   */
-  case class CNF(token: Int) extends GCMessage[Nothing] {
     override def refs: Iterable[RefInfo] = Nil
   }
 
@@ -72,30 +63,15 @@ object MAC {
 
 }
 
-class MAC(system: ExtendedActorSystem) extends Engine {
-  import MAC._
+class WRC(system: ExtendedActorSystem) extends Engine {
+  import WRC._
 
-  override type GCMessageImpl[+T] = MAC.GCMessage[T]
-  override type ActorRefImpl = MAC.RefInfo
-  override type SpawnInfoImpl = MAC.SpawnInfo
-  override type StateImpl = MAC.State
-
+  override type GCMessageImpl[+T] = WRC.GCMessage[T]
+  override type ActorRefImpl = WRC.RefInfo
+  override type SpawnInfoImpl = WRC.SpawnInfo
+  override type StateImpl = WRC.State
 
   val config: Config = system.settings.config
-  private val cycleDetectionEnabled: Boolean =
-    config.getBoolean("uigc.mac.cycle-detection")
-
-  val Queue: ConcurrentLinkedQueue[CycleDetector.CycleDetectionProtocol] = new ConcurrentLinkedQueue()
-
-  val bookkeeper: org.apache.pekko.actor.ActorRef = {
-    if (cycleDetectionEnabled)
-      system.systemActorOf(
-        org.apache.pekko.actor.Props[CycleDetector]().withDispatcher("my-pinned-dispatcher"),
-        "CycleDetector"
-      )
-    else null
-  }
-
 
   /** Transform a message from a non-GC actor so that it can be understood by a GC actor.
     * Necessarily, the recipient is a root actor.
@@ -116,18 +92,6 @@ class MAC(system: ExtendedActorSystem) extends Engine {
     state.actorMap(context.self) = pair
 
     def onBlock(): Unit = {
-      if (cycleDetectionEnabled && !state.hasSentBLK) {
-        // Copy the names and weights of state.actorMap into an array.
-        // Then send it in a BLK message to the cycle detector.
-        val array = new Array[(Name, Long)](state.actorMap.size)
-        var i = 0
-        for ((name, pair) <- state.actorMap) {
-          array(i) = (name, pair.weight)
-          i += 1
-        }
-        Queue.add(CycleDetector.BLK(context.self, array))
-        state.hasSentBLK = true
-      }
       // Record metrics.
       val event = new ActorBlockedEvent()
       event.appMsgCount = state.appMsgCount
@@ -161,10 +125,6 @@ class MAC(system: ExtendedActorSystem) extends Engine {
   }
 
   private def unblocked(state: State, ctx: actor.ActorContext): Unit = {
-    if (cycleDetectionEnabled && state.hasSentBLK) {
-      state.hasSentBLK = false
-      Queue.add(CycleDetector.UNB(ctx.self))
-    }
   }
 
   override def preMessageImpl[T](
@@ -195,12 +155,6 @@ class MAC(system: ExtendedActorSystem) extends Engine {
       unblocked(state, ctx)
       state.ctrlMsgCount += 1
       state.rc = state.rc + RC_INC
-      None
-    case CNF(token) =>
-      state.ctrlMsgCount += 1
-      if (cycleDetectionEnabled && state.hasSentBLK) {
-        Queue.add(CycleDetector.ACK(ctx.self, token))
-      }
       None
   }
 

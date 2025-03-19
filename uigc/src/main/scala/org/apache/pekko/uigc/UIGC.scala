@@ -2,7 +2,7 @@ package org.apache.pekko.uigc
 
 import org.apache.pekko.actor.{ActorSystem, ClassicActorSystemProvider, ExtendedActorSystem, ExtensionId, ExtensionIdProvider}
 import org.apache.pekko.uigc.engines.crgc.CRGC
-import org.apache.pekko.uigc.engines.mac.MAC
+import org.apache.pekko.uigc.engines.wrc.WRC
 import org.apache.pekko.uigc.engines.{Engine, Manual}
 
 /** The UIGC system extension. */
@@ -13,7 +13,7 @@ object UIGC extends ExtensionId[Engine] with ExtensionIdProvider {
     val config = system.settings.config
     config.getString("uigc.engine") match {
       case "crgc"   => new CRGC(system)
-      case "mac"    => new MAC(system)
+      case "wrc"    => new WRC(system)
       case "manual" => new Manual
     }
   }

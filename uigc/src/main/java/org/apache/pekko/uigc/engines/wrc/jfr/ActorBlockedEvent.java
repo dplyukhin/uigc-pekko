@@ -1,8 +1,8 @@
-package org.apache.pekko.uigc.engines.mac.jfr;
+package org.apache.pekko.uigc.engines.wrc.jfr;
 
 import jdk.jfr.*;
 
-@Label("MAC Actor Blocked")
+@Label("WRC Actor Blocked")
 @Category("UIGC")
 @Description("An actor finished processing messages in its mail queue.")
 @StackTrace(false)
