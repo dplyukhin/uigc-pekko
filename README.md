@@ -1,5 +1,6 @@
-# Pekko + UIGC
-
+<p align="center">
+  <img src="./uigc-logo.svg" alt="UIGC Logo" width="500px" title="UIGC Logo" />
+</p>
 
 This project is a fork of Apache Pekko with a new module called *UIGC*.
 UIGC is a "UnIfied" Garbage Collection API for actors: you can use it
